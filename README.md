@@ -1,7 +1,7 @@
-# `LLMLean` 
+# LLMLean
 1. Install [ollama](https://ollama.com/).
 
-2. Pull the language model:
+2. Pull a language model:
 ```bash
 ollama pull solobsd/llemma-7b
 ```
@@ -17,10 +17,11 @@ require llmlean from git
 import LLMlean
 ```
 
+Then use a tactic or command described below.
 
----
+----
 ### `llmstep` tactic
-Next-tactic suggestions via `llmstep "{prefix}"`, where `{prefix}` is arbitrary. Examples:
+Next-tactic suggestions via `llmstep "{prefix}"`. Examples:
 
 - `llmstep ""`
 
@@ -30,3 +31,9 @@ Next-tactic suggestions via `llmstep "{prefix}"`, where `{prefix}` is arbitrary.
 
   <img src="img/llmstep_apply.png" style="width:500px">
 
+---------------
+
+## Customization
+
+Please see the following:
+1. [Customization](docs/customization.md)
