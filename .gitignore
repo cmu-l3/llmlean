@@ -1,0 +1,7 @@
+/build
+/lake-packages/*
+.lake
+.idea
+.DS_Store
+*.pyc
+*.olean
