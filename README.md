@@ -9,7 +9,7 @@ ollama pull solobsd/llemma-7b
 4. Add `llmlean` to lakefile:
 ```lean
 require llmlean from git
-  "git@github.com:wellecks/llm-lean.git"
+  "https://github.com/cmu-l3/llmlean.git"
 ```
 
 3. Import:
