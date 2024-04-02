@@ -8,13 +8,13 @@
 ollama pull solobsd/llemma-7b
 ```
 
-4. Add `llmlean` to lakefile:
+3. Add `llmlean` to lakefile:
 ```lean
 require llmlean from git
   "https://github.com/cmu-l3/llmlean.git"
 ```
 
-3. Import:
+4. Import:
 ```lean
 import LLMlean
 ```
@@ -28,7 +28,7 @@ Now use a tactic described below.
 
 <img src="img/env_example1.png" style="width:500px">
 
-Now use a tactic described below.
+Then do steps (3) and (4) above. Now use a tactic described below.
 
 ----
 ### `llmstep` tactic
