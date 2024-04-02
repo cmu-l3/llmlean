@@ -26,7 +26,7 @@ Now use a tactic described below.
 
 2. Set environment variables in VS Code. Example:
 
-<img src="img/env_example.png" style="width:500px">
+<img src="img/env_example1.png" style="width:500px">
 
 Now use a tactic described below.
 
