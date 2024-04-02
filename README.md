@@ -1,4 +1,6 @@
 # LLMLean
+
+#### LLM on your laptop:
 1. Install [ollama](https://ollama.com/).
 
 2. Pull a language model:
@@ -16,8 +18,17 @@ require llmlean from git
 ```lean
 import LLMlean
 ```
+Now use a tactic described below.
 
-Then use a tactic or command described below.
+#### LLM in the cloud:
+
+1. Get a [together.ai](https://www.together.ai/) API key.
+
+2. Set environment variables in VS Code. Example:
+
+<img src="img/env_example.png" style="width:500px">
+
+Now use a tactic described below.
 
 ----
 ### `llmstep` tactic
