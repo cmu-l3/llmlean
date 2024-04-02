@@ -2,13 +2,34 @@
 
 The following environment variables let you customize LLMLean.
 
-- `LLMLEAN_ENDPOINT`: API endpoint
-- `LLMLEAN_PROMPT`:
-  - "fewshot" :  for base models
-  - "instruction" : for instruction-tuned models
+#### LLM on your laptop
 - `LLMLEAN_API`:
-  - "ollama" : to use ollama
-  - "together" : to use a Together API endpoint (or your own server)
+  - `ollama` : to use ollama (default)
+- `LLMLEAN_ENDPOINT`: 
+  - With ollama it is `http://localhost:11434/api/generate` (default)
+- `LLMLEAN_PROMPT`:
+  - `fewshot` :  for base models (default)
+  - `instruction` : for instruction-tuned models
+- `LLMLEAN_MODEL`:
+  - Example: `solobsd/llemma-7b` (default) 
+
+#### LLM in the cloud
+
+- `LLMLEAN_API`:
+  - `together` : to use Together API (or your own server)
+- `LLMLEAN_API_KEY`:
+  - [API key](https://api.together.xyz/settings/api-keys) for Together API
+- `LLMLEAN_ENDPOINT`: API endpoint
+  - `https://api.together.xyz/v1/completions` for Together API
+- `LLMLEAN_PROMPT`:
+  - `fewshot` :  for base models
+  - `instruction` : for instruction-tuned models (preferred)
+- `LLMLEAN_MODEL`:
+  - Example for Together API: `mistralai/Mixtral-8x7B-Instruct-v0.1`
+ 
+Example:
+
+<img src="../img/env_example.png" width=500px>
 
 #### Setting environment variables
 To set environment variables in VS Code, go to:
