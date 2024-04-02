@@ -14,6 +14,9 @@ The following environment variables let you customize LLMLean.
   - Example: `solobsd/llemma-7b` (default) 
 
 #### LLM in the cloud
+Example:
+
+<img src="../img/env_example.png" width=500px>
 
 - `LLMLEAN_API`:
   - `together` : to use Together API (or your own server)
@@ -27,9 +30,7 @@ The following environment variables let you customize LLMLean.
 - `LLMLEAN_MODEL`:
   - Example for Together API: `mistralai/Mixtral-8x7B-Instruct-v0.1`
  
-Example:
 
-<img src="../img/env_example.png" width=500px>
 
 #### Setting environment variables
 To set environment variables in VS Code, go to:
