@@ -42,6 +42,15 @@ Next-tactic suggestions via `llmstep "{prefix}"`. Examples:
 
   <img src="img/llmstep_apply.png" style="width:500px">
 
+The suggestions are checked in Lean.
+
+### `llmqed` tactic
+Complete the current proof via `llmqed`. Examples:
+
+- <img src="img/llmqed_example.png" style="width:500px">
+
+Checked suggestions coming soon!
+
 ---------------
 
 ## Customization
