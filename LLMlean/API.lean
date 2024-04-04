@@ -59,7 +59,7 @@ structure OllamaQedRequest where
   stream : Bool := false
 deriving ToJson
 
-structure OllamaTacticGenerationResponse where
+structure OllamaResponse where
   response : String
 deriving FromJson
 
@@ -89,7 +89,7 @@ structure TogetherAIChoice where
 deriving FromJson
 
 
-structure TogetherAITacticGenerationResponse where
+structure TogetherAIResponse where
   id : String
   choices : List TogetherAIChoice
 deriving FromJson
@@ -259,7 +259,7 @@ def makeQedPrompts (promptKind : PromptKind) (context : String) (state : String)
   | _ => makeQedPromptsInstruct context state
 
 
-def filterTactics (s: String) : Bool :=
+def filterGeneration (s: String) : Bool :=
   let banned := ["sorry", "admit", "▅"]
   !(banned.any fun s' => (s.splitOn s').length > 1)
 
@@ -268,10 +268,10 @@ def splitTac (text : String) : String :=
   | some s => s
   | none => text
 
-def parseResponseOllama (res: OllamaTacticGenerationResponse) : String :=
+def parseResponseOllama (res: OllamaResponse) : String :=
   splitTac res.response
 
-def parseResponseTogetherAI (res: TogetherAITacticGenerationResponse) (pfx : String) : Array String :=
+def parseResponseTogetherAI (res: TogetherAIResponse) (pfx : String) : Array String :=
   (res.choices.map fun x => pfx ++ (splitTac x.text)).toArray
 
 def tacticGenerationOllama (pfx : String) (prompts : List String)
@@ -286,10 +286,10 @@ def tacticGenerationOllama (pfx : String) (prompts : List String)
         stream := false,
         options := { temperature := temperature }
       }
-      let res : OllamaTacticGenerationResponse ← post req api.baseUrl api.key
+      let res : OllamaResponse ← post req api.baseUrl api.key
       results := results.insert (pfx ++ (parseResponseOllama res))
 
-  let finalResults := (results.toArray.filter filterTactics).map fun x => (x, 1.0)
+  let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
   return finalResults
 
 
@@ -304,11 +304,11 @@ def tacticGenerationTogetherAI (pfx : String) (prompts : List String)
       temperature := options.temperature
     }
 
-    let res : TogetherAITacticGenerationResponse ← post req api.baseUrl api.key
+    let res : TogetherAIResponse ← post req api.baseUrl api.key
     for result in (parseResponseTogetherAI res pfx) do
       results := results.insert result
 
-  let finalResults := (results.toArray.filter filterTactics).map fun x => (x, 1.0)
+  let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
   return finalResults
 
 def splitProof (text : String) : String :=
@@ -316,10 +316,10 @@ def splitProof (text : String) : String :=
   | some s => s
   | none => text
 
-def parseResponseQedOllama (res: OllamaTacticGenerationResponse) : String :=
+def parseResponseQedOllama (res: OllamaResponse) : String :=
   splitProof res.response
 
-def parseResponseQedTogetherAI (res: TogetherAITacticGenerationResponse) : Array String :=
+def parseResponseQedTogetherAI (res: TogetherAIResponse) : Array String :=
   (res.choices.map fun x => (splitProof x.text)).toArray
 
 def qedOllama (prompts : List String)
@@ -334,10 +334,10 @@ def qedOllama (prompts : List String)
         stream := false,
         options := { temperature := temperature, stop := options.stop }
       }
-      let res : OllamaTacticGenerationResponse ← post req api.baseUrl api.key
+      let res : OllamaResponse ← post req api.baseUrl api.key
       results := results.insert ((parseResponseQedOllama res))
 
-  let finalResults := (results.toArray.filter filterTactics).map fun x => (x, 1.0)
+  let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
   return finalResults
 
 
@@ -351,12 +351,11 @@ def qedTogetherAI (prompts : List String)
       n := options.numSamples,
       temperature := options.temperature
     }
-
-    let res : TogetherAITacticGenerationResponse ← post req api.baseUrl api.key
+    let res : TogetherAIResponse ← post req api.baseUrl api.key
     for result in (parseResponseQedTogetherAI res) do
       results := results.insert result
 
-  let finalResults := (results.toArray.filter filterTactics).map fun x => (x, 1.0)
+  let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
   return finalResults
 
 
@@ -388,7 +387,6 @@ def getQedGenerationOptions (api : API): IO GenerationOptionsQed := do
 def API.tacticGeneration
   (api : API) (tacticState : String) (context : String)
   («prefix» : String) : IO $ Array (String × Float) := do
-
   let prompts := makePrompts api.promptKind context tacticState «prefix»
   let options ← getGenerationOptions api
   match api.kind with
@@ -399,7 +397,6 @@ def API.tacticGeneration
 
 def API.proofCompletion
   (api : API) (tacticState : String) (context : String) : IO $ Array (String × Float) := do
-
   let prompts := makeQedPrompts api.promptKind context tacticState
   let options ← getQedGenerationOptions api
   match api.kind with

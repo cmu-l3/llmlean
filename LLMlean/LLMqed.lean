@@ -26,6 +26,7 @@ def formatSuggestion (suggestion: String)
 (start : String.Pos)
 (column : Nat):=
   let lines := (suggestion.splitOn "\n")
+  let lines := [(lines.headD "").trim] ++ lines.tailD []
   let lines := lines.map fun (line : String) =>
     Std.Format.pretty line (indent := (body - start).1) (column := column)
   "\n".intercalate lines
