@@ -265,7 +265,7 @@ def getGenerationOptions (api : API):  IO GenerationOptions := do
   | APIKind.Ollama => "5"
   | _ => "10"
 
-  let numSamples := match ((← IO.getEnv "LLMLEAN_MODEL").getD defaultSamplesStr).toInt? with
+  let numSamples := match ((← IO.getEnv "LLMLEAN_NUMSAMPLES").getD defaultSamplesStr).toInt? with
   | some n => n.toNat
   | none => defaultSamples
 

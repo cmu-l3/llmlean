@@ -18,6 +18,8 @@ Example:
   - `instruction` : for instruction-tuned models 
 - `LLMLEAN_MODEL`:
   - Example for Together API: `mistralai/Mixtral-8x7B-Instruct-v0.1`
+- `LLMLEAN_NUMSAMPLES`:
+  - Example: `10`
  
 
 #### LLM on your laptop
@@ -30,6 +32,8 @@ Example:
   - `instruction` : for instruction-tuned models
 - `LLMLEAN_MODEL`:
   - Example: `solobsd/llemma-7b` 
+- `LLMLEAN_NUMSAMPLES`:
+  - Example: `10`
 
 
 ### Setting environment variables
