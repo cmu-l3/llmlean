@@ -32,20 +32,22 @@ structure GenerationOptions where
   «stop» : List String := ["\n", "[/TAC]"]
 deriving ToJson
 
+structure OllamaGenerationOptions where
+  temperature : Float := 0.3
+  «stop» : List String := ["\n", "[/TAC]"]
+deriving ToJson
 
 structure OllamaTacticGenerationRequest where
   model : String
   prompt : String
-  options : GenerationOptions
+  options : OllamaGenerationOptions
   raw : Bool := true
   stream : Bool := false
 deriving ToJson
 
-
 structure OllamaTacticGenerationResponse where
   response : String
 deriving FromJson
-
 
 structure TogetherAITacticGenerationRequest where
   model : String
@@ -57,11 +59,9 @@ structure TogetherAITacticGenerationRequest where
   «stop» : List String := ["\n", "[/TAC]"]
 deriving ToJson
 
-
 structure TogetherAIChoice where
   text : String
 deriving FromJson
-
 
 structure TogetherAITacticGenerationResponse where
   id : String
