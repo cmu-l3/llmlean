@@ -47,9 +47,9 @@ The suggestions are checked in Lean.
 ### `llmqed` tactic
 Complete the current proof via `llmqed`. Examples:
 
-- <img src="img/llmqed_example.png" style="width:500px">
-
 - <img src="img/llmqed_example2.png" style="width:600px">
+
+
 
 
 Checked suggestions coming soon!
