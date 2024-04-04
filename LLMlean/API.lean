@@ -4,6 +4,7 @@ open Lean
 
 namespace LLMlean
 
+
 inductive APIKind : Type
   | Ollama
   | TogetherAI
@@ -21,13 +22,13 @@ structure API where
   baseUrl : String
   kind : APIKind := APIKind.Ollama
   promptKind := PromptKind.FewShot
-  numSamples : Nat := 5
   key : String := ""
 deriving Inhabited, Repr
 
 
 structure GenerationOptions where
   temperature : Float := 0.3
+  numSamples : Nat := 10
   «stop» : List String := ["\n", "[/TAC]"]
 deriving ToJson
 
@@ -67,6 +68,41 @@ structure TogetherAITacticGenerationResponse where
   choices : List TogetherAIChoice
 deriving FromJson
 
+def getOllamaAPI : IO API := do
+  let url        := (← IO.getEnv "LLMLEAN_ENDPOINT").getD "http://localhost:11434/api/generate"
+  let model      := (← IO.getEnv "LLMLEAN_MODEL").getD "solobsd/llemma-7b"
+  let promptKind := (← IO.getEnv "LLMLEAN_PROMPT").getD "fewshot"
+  let apiKey     := (← IO.getEnv "LLMLEAN_API_KEY").getD ""
+  let api : API := {
+    model := model,
+    baseUrl := url,
+    kind := APIKind.Ollama,
+    promptKind := (if promptKind == "fewshot" then PromptKind.FewShot else PromptKind.Instruction),
+    key := apiKey
+  }
+  return api
+
+def getTogetherAPI : IO API := do
+  let url        := (← IO.getEnv "LLMLEAN_ENDPOINT").getD "https://api.together.xyz/v1/completions"
+  let model      := (← IO.getEnv "LLMLEAN_MODEL").getD "deepseek-ai/deepseek-coder-33b-instruct"
+  let promptKind := (← IO.getEnv "LLMLEAN_PROMPT").getD "instruction"
+  let apiKey     := (← IO.getEnv "LLMLEAN_API_KEY").getD ""
+  let api : API := {
+    model := model,
+    baseUrl := url,
+    kind := APIKind.TogetherAI,
+    promptKind := (if promptKind == "fewshot" then PromptKind.FewShot else PromptKind.Instruction),
+    key := apiKey
+  }
+  return api
+
+def getAPI : IO API := do
+  let apiKind  := (← IO.getEnv "LLMLEAN_API").getD "ollama"
+  match apiKind with
+  | "ollama" => getOllamaAPI
+  | _ => getTogetherAPI
+
+
 
 def post {α β : Type} [ToJson α] [FromJson β] (req : α) (url : String) (apiKey : String): IO β := do
   let out ← IO.Process.output {
@@ -79,7 +115,7 @@ def post {α β : Type} [ToJson α] [FromJson β] (req : α) (url : String) (api
       "-d", (toJson req).pretty UInt64.size]
   }
   if out.exitCode != 0 then
-     throw $ IO.userError s!"Request failed. Ensure that ollama is running, and that the ollama server is up at `{url}`. If the ollama server is up at a different url, set LLMLEAN_URL to the proper url."
+     throw $ IO.userError s!"Request failed. If running locally, ensure that ollama is running, and that the ollama server is up at `{url}`. If the ollama server is up at a different url, set LLMLEAN_URL to the proper url. If using a cloud API, ensure that LLMLEAN_API_KEY is set."
   let some json := Json.parse out.stdout |>.toOption
     | throw $ IO.userError out.stdout
   let some res := (fromJson? json : Except String β) |>.toOption
@@ -186,8 +222,8 @@ def tacticGenerationOllama (pfx : String) (prompts : List String)
 (api : API) (options : GenerationOptions) : IO $ Array (String × Float) := do
   let mut results : HashSet String := HashSet.empty
   for prompt in prompts do
-    for i in List.range api.numSamples do
-      let temperature := if i == 1 then 0.0 else 0.3
+    for i in List.range options.numSamples do
+      let temperature := if i == 1 then 0.0 else options.temperature
       let req : OllamaTacticGenerationRequest := {
         model := api.model,
         prompt := prompt,
@@ -197,7 +233,7 @@ def tacticGenerationOllama (pfx : String) (prompts : List String)
       let res : OllamaTacticGenerationResponse ← post req api.baseUrl api.key
       results := results.insert (pfx ++ (parseResponseOllama res))
 
-  let finalResults := (results.toArray.filter filterTactics).map fun x => (x, 0.0)
+  let finalResults := (results.toArray.filter filterTactics).map fun x => (x, 1.0)
   return finalResults
 
 
@@ -208,14 +244,35 @@ def tacticGenerationTogetherAI (pfx : String) (prompts : List String)
     let req : TogetherAITacticGenerationRequest := {
       model := api.model,
       prompt := prompt,
+      n := options.numSamples,
+      temperature := options.temperature
     }
 
     let res : TogetherAITacticGenerationResponse ← post req api.baseUrl api.key
     for result in (parseResponseTogetherAI res pfx) do
       results := results.insert result
 
-  let finalResults := (results.toArray.filter filterTactics).map fun x => (x, 0.0)
+  let finalResults := (results.toArray.filter filterTactics).map fun x => (x, 1.0)
   return finalResults
+
+
+def getGenerationOptions (api : API):  IO GenerationOptions := do
+  let defaultSamples := match api.kind with
+  | APIKind.Ollama => 5
+  | _ => 10
+
+  let defaultSamplesStr := match api.kind with
+  | APIKind.Ollama => "5"
+  | _ => "10"
+
+  let numSamples := match ((← IO.getEnv "LLMLEAN_MODEL").getD defaultSamplesStr).toInt? with
+  | some n => n.toNat
+  | none => defaultSamples
+
+  let options : GenerationOptions := {
+    numSamples := numSamples
+  }
+  return options
 
 
 def API.tacticGeneration
@@ -223,7 +280,7 @@ def API.tacticGeneration
   («prefix» : String) : IO $ Array (String × Float) := do
 
   let prompts := makePrompts api.promptKind context tacticState «prefix»
-  let options : GenerationOptions := {}
+  let options ← getGenerationOptions api
   match api.kind with
   | APIKind.Ollama =>
     tacticGenerationOllama «prefix» prompts api options

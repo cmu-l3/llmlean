@@ -14,21 +14,6 @@ import LLMlean.API
 
 open Lean LLMlean
 
-def getAPI : IO API := do
-    let url        := (← IO.getEnv "LLMLEAN_ENDPOINT").getD "http://localhost:11434/api/generate"
-    let model      := (← IO.getEnv "LLMLEAN_MODEL").getD "solobsd/llemma-7b"
-    let promptKind := (← IO.getEnv "LLMLEAN_PROMPT").getD "fewshot"
-    let apiKind    := (← IO.getEnv "LLMLEAN_API").getD "ollama"
-    let apiKey     := (← IO.getEnv "LLMLEAN_API_KEY").getD ""
-    let api : API := {
-      model := model,
-      baseUrl := url,
-      kind := (if apiKind == "ollama" then APIKind.Ollama else APIKind.TogetherAI),
-      promptKind := (if promptKind == "fewshot" then PromptKind.FewShot else PromptKind.Instruction),
-      key := apiKey
-    }
-    return api
-
 /- Calls an LLM API with the given context, prefix and pretty-printed goal. -/
 def runSuggest (goal pre ctx: String) : IO (Array (String × Float)) := do
   let api ← getAPI

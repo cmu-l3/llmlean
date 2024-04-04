@@ -24,7 +24,7 @@ Now use a tactic described below.
 
 1. Get a [together.ai](https://www.together.ai/) API key.
 
-2. Set environment variables in VS Code. Example:
+2. Set 2 environment variables in VS Code. Example:
 
 <img src="img/env_example1.png" style="width:500px">
 

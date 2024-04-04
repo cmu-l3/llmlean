@@ -8,7 +8,7 @@ Example:
 <img src="../img/env_example.png" width=500px>
 
 - `LLMLEAN_API`:
-  - `together` : to use Together API (or your own server)
+  - `together` : to use Together API (or any similar supported API, or your own server)
 - `LLMLEAN_API_KEY`:
   - [API key](https://api.together.xyz/settings/api-keys) for Together API
 - `LLMLEAN_ENDPOINT`: API endpoint
@@ -24,12 +24,12 @@ Example:
 - `LLMLEAN_API`:
   - `ollama` : to use ollama (default)
 - `LLMLEAN_ENDPOINT`: 
-  - With ollama it is `http://localhost:11434/api/generate` (default)
+  - With ollama it is `http://localhost:11434/api/generate` 
 - `LLMLEAN_PROMPT`:
-  - `fewshot` :  for base models (default)
+  - `fewshot` :  for base models 
   - `instruction` : for instruction-tuned models
 - `LLMLEAN_MODEL`:
-  - Example: `solobsd/llemma-7b` (default) 
+  - Example: `solobsd/llemma-7b` 
 
 
 ### Setting environment variables
