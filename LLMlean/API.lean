@@ -26,26 +26,42 @@ structure API where
 deriving Inhabited, Repr
 
 
+structure GenerationOptionsOllama where
+  temperature : Float := 0.3
+  «stop» : List String := ["\n", "[/TAC]"]
+deriving ToJson
+
 structure GenerationOptions where
   temperature : Float := 0.3
   numSamples : Nat := 10
   «stop» : List String := ["\n", "[/TAC]"]
 deriving ToJson
 
+structure GenerationOptionsQed where
+  temperature : Float := 0.3
+  numSamples : Nat := 10
+  «stop» : List String := ["\n\n", "[/PROOF]"]
+deriving ToJson
 
 structure OllamaTacticGenerationRequest where
   model : String
   prompt : String
-  options : GenerationOptions
+  options : GenerationOptionsOllama
   raw : Bool := true
   stream : Bool := false
 deriving ToJson
 
+structure OllamaQedRequest where
+  model : String
+  prompt : String
+  options : GenerationOptionsOllama
+  raw : Bool := true
+  stream : Bool := false
+deriving ToJson
 
 structure OllamaTacticGenerationResponse where
   response : String
 deriving FromJson
-
 
 structure TogetherAITacticGenerationRequest where
   model : String
@@ -55,6 +71,16 @@ structure TogetherAITacticGenerationRequest where
   max_tokens : Nat := 100
   stream : Bool := false
   «stop» : List String := ["\n", "[/TAC]"]
+deriving ToJson
+
+structure TogetherAIQedRequest where
+  model : String
+  prompt : String
+  n : Nat := 5
+  temperature : Float := 0.3
+  max_tokens : Nat := 100
+  stream : Bool := false
+  «stop» : List String := ["\n\n", "[/PROOF]"]
 deriving ToJson
 
 
@@ -197,10 +223,40 @@ Put the next tactic inside [TAC]...[/TAC]
   [p1]
 
 
+def makeQedPromptsFewShot (context : String) (state : String) : List String :=
+  let p1 := context
+  [p1]
+
+def makeQedPromptsInstruct (context : String) (state : String) : List String :=
+  let p1 := "/- You are proving a theorem in Lean 4.
+You are given the following information:
+- The file contents up to the current tactic, inside [CTX]...[/CTX]
+- The current proof state, inside [STATE]...[/STATE]
+
+Your task is to generate the rest of the proof.
+Put the generation inside [PROOF]...[/PROOF]
+-/
+[CTX]
+" ++ context ++ "
+[/CTX]
+[STATE]
+" ++ state ++ "
+[/STATE]
+[PROOF]
+"
+  [p1]
+
+
 def makePrompts (promptKind : PromptKind) (context : String) (state : String) (pre: String) : List String :=
   match promptKind with
   | PromptKind.FewShot => makePromptsFewShot context state pre
   | _ => makePromptsInstruct context state pre
+
+
+def makeQedPrompts (promptKind : PromptKind) (context : String) (state : String) : List String :=
+  match promptKind with
+  | PromptKind.FewShot => makeQedPromptsFewShot context state
+  | _ => makeQedPromptsInstruct context state
 
 
 def filterTactics (s: String) : Bool :=
@@ -255,6 +311,54 @@ def tacticGenerationTogetherAI (pfx : String) (prompts : List String)
   let finalResults := (results.toArray.filter filterTactics).map fun x => (x, 1.0)
   return finalResults
 
+def splitProof (text : String) : String :=
+  match (text.splitOn "[/PROOF]").head? with
+  | some s => s
+  | none => text
+
+def parseResponseQedOllama (res: OllamaTacticGenerationResponse) : String :=
+  splitProof res.response
+
+def parseResponseQedTogetherAI (res: TogetherAITacticGenerationResponse) : Array String :=
+  (res.choices.map fun x => (splitProof x.text)).toArray
+
+def qedOllama (prompts : List String)
+(api : API) (options : GenerationOptionsQed) : IO $ Array (String × Float) := do
+  let mut results : HashSet String := HashSet.empty
+  for prompt in prompts do
+    for i in List.range options.numSamples do
+      let temperature := if i == 1 then 0.0 else options.temperature
+      let req : OllamaQedRequest := {
+        model := api.model,
+        prompt := prompt,
+        stream := false,
+        options := { temperature := temperature, stop := options.stop }
+      }
+      let res : OllamaTacticGenerationResponse ← post req api.baseUrl api.key
+      results := results.insert ((parseResponseQedOllama res))
+
+  let finalResults := (results.toArray.filter filterTactics).map fun x => (x, 1.0)
+  return finalResults
+
+
+def qedTogetherAI (prompts : List String)
+(api : API) (options : GenerationOptionsQed) : IO $ Array (String × Float) := do
+  let mut results : HashSet String := HashSet.empty
+  for prompt in prompts do
+    let req : TogetherAIQedRequest := {
+      model := api.model,
+      prompt := prompt,
+      n := options.numSamples,
+      temperature := options.temperature
+    }
+
+    let res : TogetherAITacticGenerationResponse ← post req api.baseUrl api.key
+    for result in (parseResponseQedTogetherAI res) do
+      results := results.insert result
+
+  let finalResults := (results.toArray.filter filterTactics).map fun x => (x, 1.0)
+  return finalResults
+
 
 def getGenerationOptions (api : API):  IO GenerationOptions := do
   let defaultSamples := match api.kind with
@@ -274,6 +378,12 @@ def getGenerationOptions (api : API):  IO GenerationOptions := do
   }
   return options
 
+def getQedGenerationOptions (api : API): IO GenerationOptionsQed := do
+  let options ← getGenerationOptions api
+  let options : GenerationOptionsQed := {
+    numSamples := options.numSamples
+  }
+  return options
 
 def API.tacticGeneration
   (api : API) (tacticState : String) (context : String)
@@ -287,5 +397,15 @@ def API.tacticGeneration
   | APIKind.TogetherAI =>
     tacticGenerationTogetherAI «prefix» prompts api options
 
+def API.proofCompletion
+  (api : API) (tacticState : String) (context : String) : IO $ Array (String × Float) := do
+
+  let prompts := makeQedPrompts api.promptKind context tacticState
+  let options ← getQedGenerationOptions api
+  match api.kind with
+  | APIKind.Ollama =>
+    qedOllama prompts api options
+  | APIKind.TogetherAI =>
+    qedTogetherAI prompts api options
 
 end LLMlean
