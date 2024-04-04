@@ -260,8 +260,8 @@ def makeQedPrompts (promptKind : PromptKind) (context : String) (state : String)
 
 
 def filterTactics (s: String) : Bool :=
-  let banned := ["sorry", "admit"]
-  !(banned.any fun s' => s == s')
+  let banned := ["sorry", "admit", "▅"]
+  !(banned.any fun s' => (s.splitOn s').length > 1)
 
 def splitTac (text : String) : String :=
   match (text.splitOn "[/TAC]").head? with
