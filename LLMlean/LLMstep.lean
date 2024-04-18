@@ -25,7 +25,7 @@ def runSuggest (goal pre ctx: String) : IO (Array (String × Float)) := do
     with the suggestion, and saves the call in an adjacent comment.
     Code based on `Std.Tactic.TryThis.tryThisWidget`. -/
 @[widget] def llmstepTryThisWidget : Widget.UserWidgetDefinition where
-  name := "llmstep suggestions"
+  name := "LLMLean suggestions"
   javascript := "
 import * as React from 'react';
 import { EditorContext } from '@leanprover/infoview';

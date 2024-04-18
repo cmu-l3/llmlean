@@ -1,9 +1,5 @@
 /-
-`llmstep` tactic for LLM-based next-tactic suggestions.
-Examples:
- llmstep ""
- llmstep "have"
- llmstep "apply Continuous"
+`llmqed` tactic for LLM-based proof completion.
 -/
 import Lean.Widget.UserWidget
 import Std.Lean.Position
@@ -31,6 +27,31 @@ def formatSuggestion (suggestion: String)
     Std.Format.pretty line (indent := (body - start).1) (column := column)
   "\n".intercalate lines
 
+/- Check whether the suggestion `s` completes the proof, is valid (does
+not result in an error message), or is invalid. -/
+def checkSuggestion' (s: String) : Lean.Elab.Tactic.TacticM CheckResult := do
+  withoutModifyingState do
+  try
+    /- FIXME: this only checks proofs that can be transformed into a sequence of
+       tactics by replace newlines with ; -/
+    let s' := "( " ++ s.replace "\n" " ; " ++ " )"
+    match Parser.runParserCategory (← getEnv) `tactic s' with
+      | Except.ok stx =>
+        try
+          _ ← Lean.Elab.Tactic.evalTactic stx
+          let goals ← Lean.Elab.Tactic.getUnsolvedGoals
+          if (← getThe Core.State).messages.hasErrors then
+            pure CheckResult.Invalid
+          else if goals.isEmpty then
+            pure CheckResult.ProofDone
+          else
+            pure CheckResult.Valid
+        catch _ =>
+          pure CheckResult.Invalid
+      | Except.error _ =>
+        pure CheckResult.Invalid
+    catch _ => pure CheckResult.Invalid
+
 
 def addSuggestions' (tacRef : Syntax) (suggestions: Array (String × Float))
     (origSpan? : Option Syntax := none)
@@ -41,7 +62,7 @@ def addSuggestions' (tacRef : Syntax) (suggestions: Array (String × Float))
     let start := findLineStart map.source tacticRange.start
     let body := map.source.findAux (· ≠ ' ') tacticRange.start start
 
-    let checks ← suggestions.mapM fun _ => return CheckResult.Valid
+    let checks ← suggestions.mapM checkSuggestion'
     let texts : Array String := suggestions.map fun text =>
       formatSuggestion text body start (tacticRange.start - start).1
 
@@ -71,7 +92,7 @@ def addSuggestions' (tacRef : Syntax) (suggestions: Array (String × Float))
     Widget.saveWidgetInfo ``llmstepTryThisWidget json (.ofRange stxRange)
 
 /--
-Call the LLM on a goal, asking for suggestions beginning with a prefix.
+Call the LLM on a goal, asking for suggestions.
 -/
 def llmQed (ctx : String) (g : MVarId) : MetaM (Array (String × Float)) := do
   let pp := toString (← Meta.ppGoal g)
