@@ -110,7 +110,7 @@ def getOllamaAPI : IO API := do
 
 def getTogetherAPI : IO API := do
   let url        := (← IO.getEnv "LLMLEAN_ENDPOINT").getD "https://api.together.xyz/v1/completions"
-  let model      := (← IO.getEnv "LLMLEAN_MODEL").getD "deepseek-ai/deepseek-coder-33b-instruct"
+  let model      := (← IO.getEnv "LLMLEAN_MODEL").getD "meta-llama/Meta-Llama-3-70B"
   let promptKind := (← IO.getEnv "LLMLEAN_PROMPT").getD "instruction"
   let apiKey     := (← IO.getEnv "LLMLEAN_API_KEY").getD ""
   let api : API := {
