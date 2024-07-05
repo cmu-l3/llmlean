@@ -1,5 +1,5 @@
 # LLMLean
-
+You can use an LLM running on your laptop, or an LLM from the OpenAI API or Together.ai API.
 #### LLM on your laptop:
 1. Install [ollama](https://ollama.com/).
 
@@ -20,13 +20,29 @@ import LLMlean
 ```
 Now use a tactic described below.
 
-#### LLM in the cloud:
+#### LLM in the cloud (OpenAI):
+
+1. Get an [OpenAI API](https://openai.com/index/openai-api/) key.
+
+2. Set 2 environment variables:
+
+```bash
+export LLMLEAN_API=openai
+export LLMLEAN_API_KEY=your-openai-api-key
+```
+
+Then do steps (3) and (4) above. Now use a tactic described below.
+
+#### LLM in the cloud (together.ai):
 
 1. Get a [together.ai](https://www.together.ai/) API key.
 
-2. Set 2 environment variables in VS Code. Example:
+2. Set 2 environment variables:
 
-<img src="img/env_example1.png" style="width:500px">
+```bash
+export LLMLEAN_API=together
+export LLMLEAN_API_KEY=your-together-api-key
+```
 
 Then do steps (3) and (4) above. Now use a tactic described below.
 
