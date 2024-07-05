@@ -5,19 +5,19 @@ The following environment variables let you customize LLMLean.
 #### LLM in the cloud
 Example:
 
-<img src="../img/env_example.png" width=500px>
-
 - `LLMLEAN_API`:
-  - `together` : to use Together API (or any similar supported API, or your own server)
+  - `together` : to use Together.ai API
+  - `openai` : to use OpenAI API
 - `LLMLEAN_API_KEY`:
-  - [API key](https://api.together.xyz/settings/api-keys) for Together API
+  - E.g. [API key](https://api.together.xyz/settings/api-keys) for Together API, or OpenAI API key
 - `LLMLEAN_ENDPOINT`: API endpoint
-  - `https://api.together.xyz/v1/completions` for Together API
+  - E.g. `https://api.together.xyz/v1/completions` for Together API
 - `LLMLEAN_PROMPT`:
   - `fewshot` :  for base models
   - `instruction` : for instruction-tuned models 
 - `LLMLEAN_MODEL`:
   - Example for Together API: `mistralai/Mixtral-8x7B-Instruct-v0.1`
+  - Example for Open AI: `gpt-4o`
 - `LLMLEAN_NUMSAMPLES`:
   - Example: `10`
  
@@ -36,11 +36,4 @@ Example:
   - Example: `10`
 
 
-### Setting environment variables
-To set environment variables in VS Code, go to:
 
-- Settings (`Command` + `,` on Mac)
-- Extensions -> Lean 4
-- Add the environment variables to Server Env. 
-
-Then restart the Lean Server (`Command` + `t`, then type `> Lean 4: Restart Server`).
