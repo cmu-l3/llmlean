@@ -8,6 +8,7 @@ namespace LLMlean
 inductive APIKind : Type
   | Ollama
   | TogetherAI
+  | OpenAI
   deriving Inhabited, Repr
 
 
@@ -32,13 +33,13 @@ structure GenerationOptionsOllama where
 deriving ToJson
 
 structure GenerationOptions where
-  temperature : Float := 0.3
+  temperature : Float := 0.7
   numSamples : Nat := 10
   «stop» : List String := ["\n", "[/TAC]"]
 deriving ToJson
 
 structure GenerationOptionsQed where
-  temperature : Float := 0.3
+  temperature : Float := 0.7
   numSamples : Nat := 10
   «stop» : List String := ["\n\n", "[/PROOF]"]
 deriving ToJson
@@ -67,7 +68,7 @@ structure TogetherAITacticGenerationRequest where
   model : String
   prompt : String
   n : Nat := 5
-  temperature : Float := 0.3
+  temperature : Float := 0.7
   max_tokens : Nat := 100
   stream : Bool := false
   «stop» : List String := ["\n", "[/TAC]"]
@@ -77,8 +78,8 @@ structure TogetherAIQedRequest where
   model : String
   prompt : String
   n : Nat := 5
-  temperature : Float := 0.3
-  max_tokens : Nat := 100
+  temperature : Float := 0.7
+  max_tokens : Nat := 512
   stream : Bool := false
   «stop» : List String := ["\n\n", "[/PROOF]"]
 deriving ToJson
@@ -88,10 +89,43 @@ structure TogetherAIChoice where
   text : String
 deriving FromJson
 
-
 structure TogetherAIResponse where
   id : String
   choices : List TogetherAIChoice
+deriving FromJson
+
+structure OpenAIMessage where
+  role : String
+  content : String
+deriving FromJson, ToJson
+
+structure OpenAIQedRequest where
+  model : String
+  messages : List OpenAIMessage
+  n : Nat := 5
+  temperature : Float := 0.7
+  max_tokens : Nat := 512
+  stream : Bool := false
+  «stop» : List String := ["\n\n", "[/PROOF]"]
+deriving ToJson
+
+structure OpenAITacticGenerationRequest where
+  model : String
+  messages : List OpenAIMessage
+  n : Nat := 5
+  temperature : Float := 0.7
+  max_tokens : Nat := 100
+  stream : Bool := false
+  «stop» : List String := ["[/TAC]"]
+deriving ToJson
+
+structure OpenAIChoice where
+  message : OpenAIMessage
+deriving FromJson
+
+structure OpenAIResponse where
+  id : String
+  choices : List OpenAIChoice
 deriving FromJson
 
 def getOllamaAPI : IO API := do
@@ -122,11 +156,27 @@ def getTogetherAPI : IO API := do
   }
   return api
 
+
+def getOpenAIAPI : IO API := do
+  let url        := (← IO.getEnv "LLMLEAN_ENDPOINT").getD "https://api.openai.com/v1/chat/completions"
+  let model      := (← IO.getEnv "LLMLEAN_MODEL").getD "gpt-4o"
+  let promptKind := (← IO.getEnv "LLMLEAN_PROMPT").getD "instruction"
+  let apiKey     := (← IO.getEnv "LLMLEAN_API_KEY").getD ""
+  let api : API := {
+    model := model,
+    baseUrl := url,
+    kind := APIKind.OpenAI,
+    promptKind := (if promptKind == "fewshot" then PromptKind.FewShot else PromptKind.Instruction),
+    key := apiKey
+  }
+  return api
+
 def getAPI : IO API := do
   let apiKind  := (← IO.getEnv "LLMLEAN_API").getD "ollama"
   match apiKind with
   | "ollama" => getOllamaAPI
-  | _ => getTogetherAPI
+  | "together" => getTogetherAPI
+  | _ => getOpenAIAPI
 
 
 
@@ -210,7 +260,7 @@ You are given the following information:
 - The current proof state, inside [STATE]...[/STATE]
 
 Your task is to generate the next tactic in the proof.
-Put the next tactic inside [TAC]...[/TAC]
+Put the next tactic inside [TAC]...[/TAC].
 -/
 [CTX]
 " ++ context ++ "
@@ -234,7 +284,19 @@ You are given the following information:
 - The current proof state, inside [STATE]...[/STATE]
 
 Your task is to generate the rest of the proof.
-Put the generation inside [PROOF]...[/PROOF]
+Put the generation inside [PROOF]...[/PROOF].
+If you find it helpful, you can precede the proof with brief thoughts inside [THOUGHTS]...[/THOUGHTS]
+In summary, your output should be of the form:
+[THOUGHTS]
+...
+[/THOUGHTS]
+[PROOF]
+...
+[/PROOF]
+Your proof will be checked by combining each line with a ; combinator and checking
+the resulting combined tactic.
+Therefore, make sure the proof is formatted as one tactic per line,
+with no additional comments or text.
 -/
 [CTX]
 " ++ context ++ "
@@ -242,7 +304,6 @@ Put the generation inside [PROOF]...[/PROOF]
 [STATE]
 " ++ state ++ "
 [/STATE]
-[PROOF]
 "
   [p1]
 
@@ -264,15 +325,20 @@ def filterGeneration (s: String) : Bool :=
   !(banned.any fun s' => (s.splitOn s').length > 1)
 
 def splitTac (text : String) : String :=
+  let text := text.replace "[TAC]" ""
   match (text.splitOn "[/TAC]").head? with
-  | some s => s
-  | none => text
+  | some s => s.trim
+  | none => text.trim
 
 def parseResponseOllama (res: OllamaResponse) : String :=
   splitTac res.response
 
+
 def parseResponseTogetherAI (res: TogetherAIResponse) (pfx : String) : Array String :=
   (res.choices.map fun x => pfx ++ (splitTac x.text)).toArray
+
+def parseTacticResponseOpenAI (res: OpenAIResponse) (pfx : String) : Array String :=
+  (res.choices.map fun x => pfx ++ (splitTac x.message.content)).toArray
 
 def tacticGenerationOllama (pfx : String) (prompts : List String)
 (api : API) (options : GenerationOptions) : IO $ Array (String × Float) := do
@@ -292,7 +358,6 @@ def tacticGenerationOllama (pfx : String) (prompts : List String)
   let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
   return finalResults
 
-
 def tacticGenerationTogetherAI (pfx : String) (prompts : List String)
 (api : API) (options : GenerationOptions) : IO $ Array (String × Float) := do
   let mut results : HashSet String := HashSet.empty
@@ -311,16 +376,42 @@ def tacticGenerationTogetherAI (pfx : String) (prompts : List String)
   let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
   return finalResults
 
+def tacticGenerationOpenAI (pfx : String) (prompts : List String)
+(api : API) (options : GenerationOptions) : IO $ Array (String × Float) := do
+  let mut results : HashSet String := HashSet.empty
+  for prompt in prompts do
+    let req : OpenAITacticGenerationRequest := {
+      model := api.model,
+      messages := [
+        {
+          role := "user",
+          content := prompt
+        }
+      ],
+      n := options.numSamples,
+      temperature := options.temperature
+    }
+    let res : OpenAIResponse ← post req api.baseUrl api.key
+    for result in (parseTacticResponseOpenAI res pfx) do
+      results := results.insert result
+
+  let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
+  return finalResults
+
 def splitProof (text : String) : String :=
+  let text := ((text.splitOn "[PROOF]").tailD [text]).headD text
   match (text.splitOn "[/PROOF]").head? with
-  | some s => s
-  | none => text
+  | some s => s.trim
+  | none => text.trim
 
 def parseResponseQedOllama (res: OllamaResponse) : String :=
   splitProof res.response
 
 def parseResponseQedTogetherAI (res: TogetherAIResponse) : Array String :=
   (res.choices.map fun x => (splitProof x.text)).toArray
+
+def parseResponseQedOpenAI (res: OpenAIResponse) : Array String :=
+  (res.choices.map fun x => (splitProof x.message.content)).toArray
 
 def qedOllama (prompts : List String)
 (api : API) (options : GenerationOptionsQed) : IO $ Array (String × Float) := do
@@ -359,6 +450,28 @@ def qedTogetherAI (prompts : List String)
   return finalResults
 
 
+def qedOpenAI (prompts : List String)
+(api : API) (options : GenerationOptionsQed) : IO $ Array (String × Float) := do
+  let mut results : HashSet String := HashSet.empty
+  for prompt in prompts do
+    let req : OpenAIQedRequest := {
+      model := api.model,
+      messages := [
+        {
+          role := "user",
+          content := prompt
+        }
+      ],
+      n := options.numSamples,
+      temperature := options.temperature
+    }
+    let res : OpenAIResponse ← post req api.baseUrl api.key
+    for result in (parseResponseQedOpenAI res) do
+      results := results.insert result
+
+  let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
+  return finalResults
+
 def getGenerationOptions (api : API):  IO GenerationOptions := do
   let defaultSamples := match api.kind with
   | APIKind.Ollama => 5
@@ -394,6 +507,8 @@ def API.tacticGeneration
     tacticGenerationOllama «prefix» prompts api options
   | APIKind.TogetherAI =>
     tacticGenerationTogetherAI «prefix» prompts api options
+  | APIKind.OpenAI =>
+    tacticGenerationOpenAI «prefix» prompts api options
 
 def API.proofCompletion
   (api : API) (tacticState : String) (context : String) : IO $ Array (String × Float) := do
@@ -404,5 +519,7 @@ def API.proofCompletion
     qedOllama prompts api options
   | APIKind.TogetherAI =>
     qedTogetherAI prompts api options
+  | APIKind.OpenAI =>
+    qedOpenAI prompts api options
 
 end LLMlean

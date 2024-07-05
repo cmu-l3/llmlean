@@ -25,7 +25,7 @@ def formatSuggestion (suggestion: String)
   let lines := [(lines.headD "").trim] ++ lines.tailD []
   let lines := lines.map fun (line : String) =>
     Std.Format.pretty line (indent := (body - start).1) (column := column)
-  "\n".intercalate lines
+  "\n  ".intercalate lines
 
 /- Check whether the suggestion `s` completes the proof, is valid (does
 not result in an error message), or is invalid. -/
