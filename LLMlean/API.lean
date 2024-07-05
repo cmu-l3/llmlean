@@ -30,6 +30,9 @@ deriving Inhabited, Repr
 structure GenerationOptionsOllama where
   temperature : Float := 0.3
   «stop» : List String := ["\n", "[/TAC]"]
+
+  /-- Maximum number of tokens to generate. `-1` means no limit. -/
+  num_predict : Int := 100
 deriving ToJson
 
 structure GenerationOptions where
