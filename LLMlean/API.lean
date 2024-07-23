@@ -15,6 +15,7 @@ inductive APIKind : Type
 inductive PromptKind : Type
   | FewShot
   | Instruction
+  | Detailed
   deriving Inhabited, Repr
 
 
@@ -28,9 +29,8 @@ deriving Inhabited, Repr
 
 
 structure GenerationOptionsOllama where
-  temperature : Float := 0.3
-  «stop» : List String := ["\n", "[/TAC]"]
-
+  temperature : Float := 0.7
+  «stop» : List String := ["[/TAC]"]
   /-- Maximum number of tokens to generate. `-1` means no limit. -/
   num_predict : Int := 100
 deriving ToJson
@@ -44,14 +44,14 @@ deriving ToJson
 structure GenerationOptionsQed where
   temperature : Float := 0.7
   numSamples : Nat := 10
-  «stop» : List String := ["\n\n", "[/PROOF]"]
+  «stop» : List String := ["\n\n"]
 deriving ToJson
 
 structure OllamaTacticGenerationRequest where
   model : String
   prompt : String
   options : GenerationOptionsOllama
-  raw : Bool := true
+  raw : Bool := false
   stream : Bool := false
 deriving ToJson
 
@@ -59,7 +59,7 @@ structure OllamaQedRequest where
   model : String
   prompt : String
   options : GenerationOptionsOllama
-  raw : Bool := true
+  raw : Bool := false
   stream : Bool := false
 deriving ToJson
 
@@ -86,7 +86,6 @@ structure TogetherAIQedRequest where
   stream : Bool := false
   «stop» : List String := ["\n\n", "[/PROOF]"]
 deriving ToJson
-
 
 structure TogetherAIChoice where
   text : String
@@ -131,16 +130,22 @@ structure OpenAIResponse where
   choices : List OpenAIChoice
 deriving FromJson
 
+def getPromptKind (stringArg: String) : PromptKind :=
+  match stringArg with
+  | "fewshot" => PromptKind.FewShot
+  | "detailed" => PromptKind.Detailed
+  | _ => PromptKind.Instruction
+
 def getOllamaAPI : IO API := do
   let url        := (← IO.getEnv "LLMLEAN_ENDPOINT").getD "http://localhost:11434/api/generate"
-  let model      := (← IO.getEnv "LLMLEAN_MODEL").getD "solobsd/llemma-7b"
-  let promptKind := (← IO.getEnv "LLMLEAN_PROMPT").getD "fewshot"
+  let model      := (← IO.getEnv "LLMLEAN_MODEL").getD "wellecks/ntpctx-llama3-8b"
+  let promptKind := (← IO.getEnv "LLMLEAN_PROMPT").getD "instruction"
   let apiKey     := (← IO.getEnv "LLMLEAN_API_KEY").getD ""
   let api : API := {
     model := model,
     baseUrl := url,
     kind := APIKind.Ollama,
-    promptKind := (if promptKind == "fewshot" then PromptKind.FewShot else PromptKind.Instruction),
+    promptKind := getPromptKind promptKind,
     key := apiKey
   }
   return api
@@ -148,13 +153,13 @@ def getOllamaAPI : IO API := do
 def getTogetherAPI : IO API := do
   let url        := (← IO.getEnv "LLMLEAN_ENDPOINT").getD "https://api.together.xyz/v1/completions"
   let model      := (← IO.getEnv "LLMLEAN_MODEL").getD "meta-llama/Meta-Llama-3-70B"
-  let promptKind := (← IO.getEnv "LLMLEAN_PROMPT").getD "instruction"
+  let promptKind := (← IO.getEnv "LLMLEAN_PROMPT").getD "detailed"
   let apiKey     := (← IO.getEnv "LLMLEAN_API_KEY").getD ""
   let api : API := {
     model := model,
     baseUrl := url,
     kind := APIKind.TogetherAI,
-    promptKind := (if promptKind == "fewshot" then PromptKind.FewShot else PromptKind.Instruction),
+    promptKind := getPromptKind promptKind,
     key := apiKey
   }
   return api
@@ -163,13 +168,13 @@ def getTogetherAPI : IO API := do
 def getOpenAIAPI : IO API := do
   let url        := (← IO.getEnv "LLMLEAN_ENDPOINT").getD "https://api.openai.com/v1/chat/completions"
   let model      := (← IO.getEnv "LLMLEAN_MODEL").getD "gpt-4o"
-  let promptKind := (← IO.getEnv "LLMLEAN_PROMPT").getD "instruction"
+  let promptKind := (← IO.getEnv "LLMLEAN_PROMPT").getD "detailed"
   let apiKey     := (← IO.getEnv "LLMLEAN_API_KEY").getD ""
   let api : API := {
     model := model,
     baseUrl := url,
     kind := APIKind.OpenAI,
-    promptKind := (if promptKind == "fewshot" then PromptKind.FewShot else PromptKind.Instruction),
+    promptKind := getPromptKind promptKind,
     key := apiKey
   }
   return api
@@ -180,8 +185,6 @@ def getAPI : IO API := do
   | "ollama" => getOllamaAPI
   | "together" => getTogetherAPI
   | _ => getOpenAIAPI
-
-
 
 def post {α β : Type} [ToJson α] [FromJson β] (req : α) (url : String) (apiKey : String): IO β := do
   let out ← IO.Process.output {
@@ -200,7 +203,6 @@ def post {α β : Type} [ToJson α] [FromJson β] (req : α) (url : String) (api
   let some res := (fromJson? json : Except String β) |>.toOption
     | throw $ IO.userError out.stdout
   return res
-
 
 def makePromptsFewShot (context : String) (state : String) (pre: String) : List String :=
   let p1 := "Given the Lean 4 tactic state, suggest a next tactic.
@@ -275,12 +277,28 @@ Put the next tactic inside [TAC]...[/TAC].
 " ++ pre
   [p1]
 
+def makePromptsDetailed (context : String) (state : String) (pre: String) : List String :=
+  makePromptsInstruct context state pre
 
 def makeQedPromptsFewShot (context : String) (state : String) : List String :=
   let p1 := context
   [p1]
 
 def makeQedPromptsInstruct (context : String) (state : String) : List String :=
+  let p1 := "/- You are proving a theorem in Lean 4.
+You are given the following information:
+- The current file contents up to and including the theorem statement, inside [CTX]...[/CTX]
+
+Your task is to generate the proof.
+Put the proof inside [PROOF]...[/PROOF]
+-/
+[CTX]
+" ++ context ++ "
+[/CTX]
+[PROOF]"
+  [p1]
+
+def makeQedPromptsDetailed (context : String) (state : String) : List String :=
   let p1 := "/- You are proving a theorem in Lean 4.
 You are given the following information:
 - The file contents up to the current tactic, inside [CTX]...[/CTX]
@@ -314,12 +332,14 @@ with no additional comments or text.
 def makePrompts (promptKind : PromptKind) (context : String) (state : String) (pre: String) : List String :=
   match promptKind with
   | PromptKind.FewShot => makePromptsFewShot context state pre
+  | PromptKind.Detailed => makePromptsDetailed context state pre
   | _ => makePromptsInstruct context state pre
 
 
 def makeQedPrompts (promptKind : PromptKind) (context : String) (state : String) : List String :=
   match promptKind with
   | PromptKind.FewShot => makeQedPromptsFewShot context state
+  | PromptKind.Detailed => makeQedPromptsDetailed context state
   | _ => makeQedPromptsInstruct context state
 
 
@@ -335,7 +355,6 @@ def splitTac (text : String) : String :=
 
 def parseResponseOllama (res: OllamaResponse) : String :=
   splitTac res.response
-
 
 def parseResponseTogetherAI (res: TogetherAIResponse) (pfx : String) : Array String :=
   (res.choices.map fun x => pfx ++ (splitTac x.text)).toArray
