@@ -32,9 +32,8 @@ not result in an error message), or is invalid. -/
 def checkSuggestion' (s: String) : Lean.Elab.Tactic.TacticM CheckResult := do
   withoutModifyingState do
   try
-    /- FIXME: this only checks proofs that can be transformed into a sequence of
-       tactics by replace newlines with ; -/
-    let s' := "( " ++ s.replace "\n" " ; " ++ " )"
+    /- FIXME: this only checks a subset of good proofs -/
+    let s' := "(" ++ (s.replace "\n" "\n ") ++ " )"
     match Parser.runParserCategory (← getEnv) `tactic s' with
       | Except.ok stx =>
         try
@@ -48,9 +47,10 @@ def checkSuggestion' (s: String) : Lean.Elab.Tactic.TacticM CheckResult := do
             pure CheckResult.Valid
         catch _ =>
           pure CheckResult.Invalid
-      | Except.error _ =>
+      | Except.error e =>
         pure CheckResult.Invalid
-    catch _ => pure CheckResult.Invalid
+    catch e =>
+      pure CheckResult.Invalid
 
 
 def addSuggestions' (tacRef : Syntax) (suggestions: Array (String × Float))
