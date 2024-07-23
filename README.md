@@ -5,7 +5,7 @@
 
 2. Pull a language model:
 ```bash
-ollama pull solobsd/llemma-7b
+ollama pull wellecks/ntpctx-llama3-8b
 ```
 
 3. Add `llmlean` to lakefile:
