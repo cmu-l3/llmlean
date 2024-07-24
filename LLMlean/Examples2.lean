@@ -18,15 +18,7 @@ example : f ⁻¹' (u ∩ v) = f ⁻¹' u ∩ f ⁻¹' v := by
   rfl
 
 example : f '' (s ∪ t) = f '' s ∪ f '' t := by
-  ext y; constructor
-  · rintro ⟨x, xs | xt, rfl⟩
-    · left
-      use x, xs
-    right
-    use x, xt
-  rintro (⟨x, xs, rfl⟩ | ⟨x, xt, rfl⟩)
-  · use x, Or.inl xs
-  use x, Or.inr xt
+  sorry
 
 example : s ⊆ f ⁻¹' (f '' s) := by
   sorry
@@ -103,29 +95,13 @@ section
 open Set Real
 
 example : InjOn log { x | x > 0 } := by
-  intro x xpos y ypos
-  intro e
-  -- log x = log y
-  calc
-    x = exp (log x) := by rw [exp_log xpos]
-    _ = exp (log y) := by rw [e]
-    _ = y := by rw [exp_log ypos]
-
+  sorry
 
 example : range exp = { y | y > 0 } := by
-  ext y; constructor
-  · rintro ⟨x, rfl⟩
-    apply exp_pos
-  intro ypos
-  use log y
-  rw [exp_log ypos]
+  sorry
 
 example : InjOn sqrt { x | x ≥ 0 } := by
-  intro x xpos y ypos e
-  calc
-      x = (sqrt x) ^ 2 := by rw [sq_sqrt xpos]
-       _ = (sqrt y) ^ 2 := by rw [e, sq_sqrt ypos]
-       _ = y := by rw [sq_sqrt ypos]
+  sorry
 
 example : InjOn (fun x ↦ x ^ 2) { x : ℝ | x ≥ 0 } := by
   sorry
@@ -185,10 +161,8 @@ theorem Cantor : ∀ f : α → Set α, ¬Surjective f := by
     intro h'
     have : j ∉ f j := by rwa [h] at h'
     contradiction
-  have h₂ : j ∈ S
-  sorry
-  have h₃ : j ∉ S
-  sorry
+  have h₂ : j ∈ S := by sorry
+  have h₃ : j ∉ S := by sorry
   contradiction
 
 -- COMMENTS: TODO: improve this
