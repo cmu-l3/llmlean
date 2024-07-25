@@ -1,5 +1,12 @@
 # LLMLean
-You can use an LLM running on your laptop, or an LLM from the OpenAI API or Together.ai API.
+
+LLMlean integrates LLMs and Lean for tactic suggestions, proof completion, and more.
+
+You can use an LLM running on your laptop, or an LLM from the Open AI API or Together.ai API:
+
+<img src="img/llmlean.png" style="width:600px">
+
+
 #### LLM on your laptop:
 1. Install [ollama](https://ollama.com/).
 
