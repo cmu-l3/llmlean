@@ -2,6 +2,10 @@
 
 LLMlean integrates LLMs and Lean for tactic suggestions, proof completion, and more.
 
+Here's an example of using LLMLean on problems from [Mathematics in Lean](https://github.com/leanprover-community/mathematics_in_lean):
+
+https://github.com/user-attachments/assets/284a8b32-b7a5-4606-8240-effe086f2b82
+
 You can use an LLM running on your laptop, or an LLM from the Open AI API or Together.ai API:
 
 <img src="img/llmlean.png" style="width:600px">
