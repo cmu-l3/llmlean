@@ -1,8 +1,5 @@
 import Mathlib
-import Mathlib.Data.Nat.Factorization.Basic
-import Mathlib.Data.Nat.Prime
 import LLMlean
-
 
 example {α : Type _} (r s t : Set α) : r ⊆ s → s ⊆ t → r ⊆ t := by
   sorry

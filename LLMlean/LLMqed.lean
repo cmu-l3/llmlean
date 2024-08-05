@@ -2,9 +2,7 @@
 `llmqed` tactic for LLM-based proof completion.
 -/
 import Lean.Widget.UserWidget
-import Std.Lean.Position
 import Lean.Meta.Tactic.TryThis
-import Std.Data.String.Basic
 
 import LLMlean.API
 import LLMlean.LLMstep
@@ -59,7 +57,7 @@ def addSuggestions' (tacRef : Syntax) (suggestions: Array (String × Float))
   let suggestions := suggestions.map fun ⟨x, _⟩ => x
   if let some tacticRange := (origSpan?.getD tacRef).getRange? then
     let map ← getFileMap
-    let start := findLineStart map.source tacticRange.start
+    let start := String.findLineStart map.source tacticRange.start
     let body := map.source.findAux (· ≠ ' ') tacticRange.start start
 
     let checks ← suggestions.mapM checkSuggestion'

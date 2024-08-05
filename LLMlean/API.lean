@@ -497,11 +497,11 @@ def qedOpenAI (prompts : List String)
 def getGenerationOptions (api : API):  IO GenerationOptions := do
   let defaultSamples := match api.kind with
   | APIKind.Ollama => 5
-  | _ => 10
+  | _ => 32
 
   let defaultSamplesStr := match api.kind with
   | APIKind.Ollama => "5"
-  | _ => "10"
+  | _ => "32"
 
   let numSamples := match ((← IO.getEnv "LLMLEAN_NUMSAMPLES").getD defaultSamplesStr).toInt? with
   | some n => n.toNat

@@ -79,9 +79,15 @@ Complete the current proof via `llmqed`. Examples:
 
 The suggestions are checked in Lean.
 
----------------
+
+
+## Demo in [PFR](https://github.com/teorth/pfr)
+
+As an example, we provide detailed instructions of using LLMLean in the [Polynomial Freiman Ruzsa conjecture formalization](https://github.com/teorth/pfr). Please see the following:
+- [PFR](docs/pfr.md)
+
 
 ## Customization
 
 Please see the following:
-1. [Customization](docs/customization.md)
+- [Customization](docs/customization.md)
