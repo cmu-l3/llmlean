@@ -5,7 +5,7 @@ package «llmlean» {
   -- add any package configuration options here
 }
 
-require mathlib from git "https://github.com/leanprover-community/mathlib4" @ "db651742f2c631e5b8525e9aabcf3d61ed094a4a"
+require mathlib from git "https://github.com/leanprover-community/mathlib4" @ "600a5fa3828fef53b2fa20d30dc8e1fb51ce0f98"
 
 @[default_target]
 lean_lib «LLMlean» {

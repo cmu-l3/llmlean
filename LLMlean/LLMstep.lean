@@ -7,7 +7,7 @@ Examples:
 -/
 import Lean.Widget.UserWidget
 import Lean.Meta.Tactic.TryThis
-import Std.Lean.Position
+-- import Std.Lean.Position
 
 import LLMlean.API
 
@@ -99,7 +99,7 @@ def addSuggestions (tacRef : Syntax) (pfxRef: Syntax) (suggestions: Array (Strin
   if let some tacticRange := (origSpan?.getD tacRef).getRange? then
     if let some argRange := (origSpan?.getD pfxRef).getRange? then
       let map ← getFileMap
-      let start := findLineStart map.source tacticRange.start
+      let start := String.findLineStart map.source tacticRange.start
       let body := map.source.findAux (· ≠ ' ') tacticRange.start start
 
       let checks ← suggestions.mapM checkSuggestion
