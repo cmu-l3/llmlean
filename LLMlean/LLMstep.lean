@@ -6,8 +6,8 @@ Examples:
  llmstep "apply Continuous"
 -/
 import Lean.Widget.UserWidget
-import Batteries.Lean.Position
 import Lean.Meta.Tactic.TryThis
+import Std.Lean.Position
 
 import LLMlean.API
 
