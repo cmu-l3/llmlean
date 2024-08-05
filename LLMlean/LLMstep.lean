@@ -7,7 +7,6 @@ Examples:
 -/
 import Lean.Widget.UserWidget
 import Lean.Meta.Tactic.TryThis
--- import Std.Lean.Position
 
 import LLMlean.API
 
