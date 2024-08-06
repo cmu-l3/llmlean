@@ -10,7 +10,6 @@ You can use an LLM running on your laptop, or an LLM from the Open AI API or Tog
 
 <img src="img/llmlean.png" style="width:600px">
 
-
 #### LLM on your laptop:
 1. Install [ollama](https://ollama.com/).
 
@@ -78,6 +77,8 @@ Complete the current proof via `llmqed`. Examples:
 
 
 The suggestions are checked in Lean.
+
+*For the best performance, especially for the `llmqed` tactic, we recommend using the Open AI API.*
 
 
 
