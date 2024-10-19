@@ -10,13 +10,17 @@ You can use an LLM running on your laptop, or an LLM from the Open AI API or Tog
 
 <img src="img/llmlean.png" style="width:600px">
 
-#### LLM on your laptop:
-1. Install [ollama](https://ollama.com/).
+#### LLM in the cloud (default):
 
-2. Pull a language model:
+1. Get an [OpenAI API](https://openai.com/index/openai-api/) key.
+
+2. Set 1 environment variable:
+
 ```bash
-ollama pull wellecks/ntpctx-llama3-8b
+export LLMLEAN_API_KEY=your-openai-api-key
 ```
+
+To do so, add the export statement to the `~/.zshrc` file (on Mac) or `~/.bashrc` (Linux), and restart VS Code.
 
 3. Add `llmlean` to lakefile:
 ```lean
@@ -28,22 +32,27 @@ require llmlean from git
 ```lean
 import LLMlean
 ```
+
 Now use a tactic described below.
+#### Option 2: LLM on your laptop:
+1. Install [ollama](https://ollama.com/).
 
-#### LLM in the cloud (OpenAI):
+2. Pull a language model:
+```bash
+ollama pull wellecks/ntpctx-llama3-8b
+```
 
-1. Get an [OpenAI API](https://openai.com/index/openai-api/) key.
-
-2. Set 2 environment variables:
-
+3. Set 2 environment variables:
 ```bash
 export LLMLEAN_API=openai
-export LLMLEAN_API_KEY=your-openai-api-key
+export LLMLEAN_MODEL=wellecks/ntpctx-llama3-8b # model name from above
 ```
 
 Then do steps (3) and (4) above. Now use a tactic described below.
 
-#### LLM in the cloud (together.ai):
+
+
+#### Option 3: LLM in the cloud (together.ai):
 
 1. Get a [together.ai](https://www.together.ai/) API key.
 
@@ -56,9 +65,8 @@ export LLMLEAN_API_KEY=your-together-api-key
 
 Then do steps (3) and (4) above. Now use a tactic described below.
 
-See [cmu-l3/llmlean-example](https://github.com/cmu-l3/llmlean-example) for an example of using LLMLean in a project.
 
-----
+## Tactics
 ### `llmstep` tactic
 Next-tactic suggestions via `llmstep "{prefix}"`. Examples:
 
