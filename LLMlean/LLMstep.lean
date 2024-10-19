@@ -22,7 +22,7 @@ def runSuggest (goal pre ctx: String) : IO (Array (String × Float)) := do
     When a suggestion is clicked, this widget replaces the `llmstep` call
     with the suggestion, and saves the call in an adjacent comment.
     Code based on `Std.Tactic.TryThis.tryThisWidget`. -/
-@[widget] def llmstepTryThisWidget : Widget.UserWidgetDefinition where
+@[widget_module] def llmstepTryThisWidget : Widget.UserWidgetDefinition where
   name := "LLMLean suggestions"
   javascript := "
 import * as React from 'react';
@@ -131,7 +131,7 @@ def addSuggestions (tacRef : Syntax) (pfxRef: Syntax) (suggestions: Array (Strin
         ("range", toJson full_range),
         ("info", extraMsg)
       ]
-      Widget.saveWidgetInfo ``llmstepTryThisWidget json (.ofRange stxRange)
+      Widget.savePanelWidgetInfo (hash llmstepTryThisWidget.javascript) (StateT.lift json) (.ofRange stxRange)
 
 /--
 Call the LLM on a goal, asking for suggestions beginning with a prefix.
