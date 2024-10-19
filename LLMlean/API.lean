@@ -151,7 +151,7 @@ def getOpenAIAPI : IO API := do
   return api
 
 def getAPI : IO API := do
-  let apiKind  := (← IO.getEnv "LLMLEAN_API").getD "ollama"
+  let apiKind  := (← IO.getEnv "LLMLEAN_API").getD "openai"
   match apiKind with
   | "ollama" => getOllamaAPI
   | "together" => getTogetherAPI
