@@ -56,6 +56,8 @@ export LLMLEAN_API_KEY=your-together-api-key
 
 Then do steps (3) and (4) above. Now use a tactic described below.
 
+See [cmu-l3/llmlean-example](https://github.com/cmu-l3/llmlean-example) for an example of using LLMLean in a project.
+
 ----
 ### `llmstep` tactic
 Next-tactic suggestions via `llmstep "{prefix}"`. Examples:
