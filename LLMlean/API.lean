@@ -67,35 +67,6 @@ structure OllamaResponse where
   response : String
 deriving FromJson
 
-structure TogetherAITacticGenerationRequest where
-  model : String
-  prompt : String
-  n : Nat := 5
-  temperature : Float := 0.7
-  max_tokens : Nat := 100
-  stream : Bool := false
-  «stop» : List String := ["\n", "[/TAC]"]
-deriving ToJson
-
-structure TogetherAIQedRequest where
-  model : String
-  prompt : String
-  n : Nat := 5
-  temperature : Float := 0.7
-  max_tokens : Nat := 512
-  stream : Bool := false
-  «stop» : List String := ["\n\n", "[/PROOF]"]
-deriving ToJson
-
-structure TogetherAIChoice where
-  text : String
-deriving FromJson
-
-structure TogetherAIResponse where
-  id : String
-  choices : List TogetherAIChoice
-deriving FromJson
-
 structure OpenAIMessage where
   role : String
   content : String
@@ -151,8 +122,8 @@ def getOllamaAPI : IO API := do
   return api
 
 def getTogetherAPI : IO API := do
-  let url        := (← IO.getEnv "LLMLEAN_ENDPOINT").getD "https://api.together.xyz/v1/completions"
-  let model      := (← IO.getEnv "LLMLEAN_MODEL").getD "meta-llama/Meta-Llama-3-70B"
+  let url        := (← IO.getEnv "LLMLEAN_ENDPOINT").getD "https://api.together.xyz/v1/chat/completions"
+  let model      := (← IO.getEnv "LLMLEAN_MODEL").getD "Qwen/Qwen2.5-72B-Instruct-Turbo"
   let promptKind := (← IO.getEnv "LLMLEAN_PROMPT").getD "detailed"
   let apiKey     := (← IO.getEnv "LLMLEAN_API_KEY").getD ""
   let api : API := {
@@ -356,9 +327,6 @@ def splitTac (text : String) : String :=
 def parseResponseOllama (res: OllamaResponse) : String :=
   splitTac res.response
 
-def parseResponseTogetherAI (res: TogetherAIResponse) (pfx : String) : Array String :=
-  (res.choices.map fun x => pfx ++ (splitTac x.text)).toArray
-
 def parseTacticResponseOpenAI (res: OpenAIResponse) (pfx : String) : Array String :=
   (res.choices.map fun x => pfx ++ (splitTac x.message.content)).toArray
 
@@ -376,24 +344,6 @@ def tacticGenerationOllama (pfx : String) (prompts : List String)
       }
       let res : OllamaResponse ← post req api.baseUrl api.key
       results := results.insert (pfx ++ (parseResponseOllama res))
-
-  let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
-  return finalResults
-
-def tacticGenerationTogetherAI (pfx : String) (prompts : List String)
-(api : API) (options : GenerationOptions) : IO $ Array (String × Float) := do
-  let mut results : HashSet String := HashSet.empty
-  for prompt in prompts do
-    let req : TogetherAITacticGenerationRequest := {
-      model := api.model,
-      prompt := prompt,
-      n := options.numSamples,
-      temperature := options.temperature
-    }
-
-    let res : TogetherAIResponse ← post req api.baseUrl api.key
-    for result in (parseResponseTogetherAI res pfx) do
-      results := results.insert result
 
   let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
   return finalResults
@@ -429,9 +379,6 @@ def splitProof (text : String) : String :=
 def parseResponseQedOllama (res: OllamaResponse) : String :=
   splitProof res.response
 
-def parseResponseQedTogetherAI (res: TogetherAIResponse) : Array String :=
-  (res.choices.map fun x => (splitProof x.text)).toArray
-
 def parseResponseQedOpenAI (res: OpenAIResponse) : Array String :=
   (res.choices.map fun x => (splitProof x.message.content)).toArray
 
@@ -452,25 +399,6 @@ def qedOllama (prompts : List String)
 
   let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
   return finalResults
-
-
-def qedTogetherAI (prompts : List String)
-(api : API) (options : GenerationOptionsQed) : IO $ Array (String × Float) := do
-  let mut results : HashSet String := HashSet.empty
-  for prompt in prompts do
-    let req : TogetherAIQedRequest := {
-      model := api.model,
-      prompt := prompt,
-      n := options.numSamples,
-      temperature := options.temperature
-    }
-    let res : TogetherAIResponse ← post req api.baseUrl api.key
-    for result in (parseResponseQedTogetherAI res) do
-      results := results.insert result
-
-  let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
-  return finalResults
-
 
 def qedOpenAI (prompts : List String)
 (api : API) (options : GenerationOptionsQed) : IO $ Array (String × Float) := do
@@ -528,7 +456,7 @@ def API.tacticGeneration
   | APIKind.Ollama =>
     tacticGenerationOllama «prefix» prompts api options
   | APIKind.TogetherAI =>
-    tacticGenerationTogetherAI «prefix» prompts api options
+    tacticGenerationOpenAI «prefix» prompts api options
   | APIKind.OpenAI =>
     tacticGenerationOpenAI «prefix» prompts api options
 
@@ -540,7 +468,7 @@ def API.proofCompletion
   | APIKind.Ollama =>
     qedOllama prompts api options
   | APIKind.TogetherAI =>
-    qedTogetherAI prompts api options
+    qedOpenAI prompts api options
   | APIKind.OpenAI =>
     qedOpenAI prompts api options
 
