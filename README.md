@@ -86,8 +86,14 @@ The suggestions are checked in Lean.
 
 ## Demo in [PFR](https://github.com/teorth/pfr)
 
-As an example, we provide detailed instructions of using LLMLean in the [Polynomial Freiman Ruzsa conjecture formalization](https://github.com/teorth/pfr). Please see the following:
-- [PFR](docs/pfr.md)
+Here is an example of proving a lemma with `llmqed` (OpenAI GPT-4o):
+
+<img src="./img/llmqed_pfr.png" style="width:800px">
+
+And using `llmqed` to make part of an existing proof simpler:
+
+<img src="./img/llmqed_pfr2.png" style="width:800px">
+
 
 
 ## Customization
