@@ -87,7 +87,7 @@ def addSuggestions' (tacRef : Syntax) (suggestions: Array (String × Float))
       ("range", toJson full_range),
       ("info", extraMsg)
     ]
-    Widget.saveWidgetInfo ``llmstepTryThisWidget json (.ofRange stxRange)
+    Widget.savePanelWidgetInfo (hash llmstepTryThisWidget.javascript) (StateT.lift json) (.ofRange stxRange)
 
 /--
 Call the LLM on a goal, asking for suggestions.
