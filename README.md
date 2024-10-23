@@ -44,7 +44,7 @@ ollama pull wellecks/ntpctx-llama3-8b
 
 3. Set 2 environment variables:
 ```bash
-export LLMLEAN_API=openai
+export LLMLEAN_API=ollama
 export LLMLEAN_MODEL=wellecks/ntpctx-llama3-8b # model name from above
 ```
 
