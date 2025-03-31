@@ -14,7 +14,7 @@ You can use an LLM running on your laptop, or an LLM from the Open AI API or Tog
 
 1. Get an [OpenAI API](https://openai.com/index/openai-api/) key.
 
-2. Modify `~/.config/llmlean/config.toml` (or `%APPDATA%\llmlean\config.toml` on Windows), and enter the following:
+2. Modify `~/.config/llmlean/config.toml` (or `C:\Users\<Username>\AppData\Roaming\llmlean\config.toml` on Windows), and enter the following:
 
 ```toml
 api = "openai"

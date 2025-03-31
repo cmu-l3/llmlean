@@ -1,6 +1,6 @@
 ### Configurations
 
-The following configurations let you customize LLMLean. Each variable can be set in the configuration file `~/.config/llmlean/config.toml` (or `%APPDATA%\llmlean\config.toml` on Windows).
+The following configurations let you customize LLMLean. Each variable can be set in the configuration file `~/.config/llmlean/config.toml` (or `C:\Users\<Username>\AppData\Roaming\llmlean\config.toml` on Windows).
 
 #### LLM in the cloud
 Example:
@@ -23,7 +23,7 @@ Example:
 - `numSamples`:
   - Example: `10`
 
-Set each variable in the configuration file, as indicated in [README](README.md). Alternatively, set environment variables `LLMLEAN_API`, `LLMLEAN_API_KEY`, `LLMLEAN_ENDPOINT`, `LLMLEAN_PROMPT`, `LLMLEAN_MODEL`, and `LLMLEAN_NUMSAMPLES` respectively, or enter `set_option llmlean.<relevant-config> <value>` before `llmstep`/`llmqed` is called.
+Set each variable in the configuration file, as indicated in [README](../README.md). Alternatively, set environment variables `LLMLEAN_API`, `LLMLEAN_API_KEY`, `LLMLEAN_ENDPOINT`, `LLMLEAN_PROMPT`, `LLMLEAN_MODEL`, and `LLMLEAN_NUMSAMPLES` respectively, or enter `set_option llmlean.<relevant-config> <value>` before `llmstep`/`llmqed` is called.
 
 #### LLM on your laptop
 - `api`:
