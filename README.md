@@ -17,8 +17,6 @@ You can use an LLM running on your laptop, or an LLM from the Open AI API or Tog
 2. Modify `~/.config/llmlean/config.toml` (or `C:\Users\<Username>\AppData\Roaming\llmlean\config.toml` on Windows), and enter the following:
 
 ```toml
-api = "openai"
-model = "gpt-4o"
 apiKey = "<your-api-key>"
 ```
 
