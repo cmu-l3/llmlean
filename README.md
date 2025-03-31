@@ -108,3 +108,13 @@ And using `llmqed` to make part of an existing proof simpler:
 
 Please see the following:
 - [Customization](docs/customization.md)
+
+
+## Testing
+Rebuild LLMLean with the config `test=on`:
+```sh
+lake -R -Ktest=on update
+lake build
+```
+Then manually check `llmlean` on the files under `LLMleanTest`.
+Currently the tests include some theorems in Mathlib and PFR.

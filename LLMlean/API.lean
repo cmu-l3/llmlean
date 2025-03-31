@@ -1,5 +1,7 @@
 /- Utilities for interacting with LLMlean API endpoints. -/
 import Lean
+import LLMlean.Config
+
 open Lean
 
 namespace LLMlean
@@ -9,6 +11,7 @@ inductive APIKind : Type
   | Ollama
   | TogetherAI
   | OpenAI
+  | Anthropic
   deriving Inhabited, Repr
 
 
@@ -92,6 +95,24 @@ structure OpenAITacticGenerationRequest where
   «stop» : List String := ["[/TAC]"]
 deriving ToJson
 
+structure AnthropicQedRequest where
+  model : String
+  messages : List OpenAIMessage
+  temperature : Float := 0.7
+  max_tokens : Nat := 512
+  stream : Bool := false
+  stop_sequences : List String := ["[/PROOF]"]
+deriving ToJson
+
+structure AnthropicTacticGenerationRequest where
+  model : String
+  messages : List OpenAIMessage
+  temperature : Float := 0.7
+  max_tokens : Nat := 100
+  stream : Bool := false
+  stop_sequences : List String := ["[/TAC]"]
+deriving ToJson
+
 structure OpenAIChoice where
   message : OpenAIMessage
 deriving FromJson
@@ -101,17 +122,26 @@ structure OpenAIResponse where
   choices : List OpenAIChoice
 deriving FromJson
 
+structure AnthropicContent where
+  text : String
+deriving FromJson
+
+structure AnthropicResponse where
+  id : String
+  content : List AnthropicContent
+deriving FromJson
+
 def getPromptKind (stringArg: String) : PromptKind :=
   match stringArg with
   | "fewshot" => PromptKind.FewShot
   | "detailed" => PromptKind.Detailed
   | _ => PromptKind.Instruction
 
-def getOllamaAPI : IO API := do
-  let url        := (← IO.getEnv "LLMLEAN_ENDPOINT").getD "http://localhost:11434/api/generate"
-  let model      := (← IO.getEnv "LLMLEAN_MODEL").getD "wellecks/ntpctx-llama3-8b"
-  let promptKind := (← IO.getEnv "LLMLEAN_PROMPT").getD "instruction"
-  let apiKey     := (← IO.getEnv "LLMLEAN_API_KEY").getD ""
+def getOllamaAPI : CoreM API := do
+  let url        := (← Config.getEndpoint).getD "http://localhost:11434/api/generate"
+  let model      := (← Config.getModel).getD "wellecks/ntpctx-llama3-8b"
+  let promptKind := (← Config.getPrompt).getD "instruction"
+  let apiKey     := (← Config.getApiKey).getD ""
   let api : API := {
     model := model,
     baseUrl := url,
@@ -121,11 +151,11 @@ def getOllamaAPI : IO API := do
   }
   return api
 
-def getTogetherAPI : IO API := do
-  let url        := (← IO.getEnv "LLMLEAN_ENDPOINT").getD "https://api.together.xyz/v1/chat/completions"
-  let model      := (← IO.getEnv "LLMLEAN_MODEL").getD "Qwen/Qwen2.5-72B-Instruct-Turbo"
-  let promptKind := (← IO.getEnv "LLMLEAN_PROMPT").getD "detailed"
-  let apiKey     := (← IO.getEnv "LLMLEAN_API_KEY").getD ""
+def getTogetherAPI : CoreM API := do
+  let url        := (← Config.getEndpoint).getD "https://api.together.xyz/v1/chat/completions"
+  let model      := (← Config.getModel).getD "Qwen/Qwen2.5-72B-Instruct-Turbo"
+  let promptKind := (← Config.getPrompt).getD "detailed"
+  let apiKey     := (← Config.getApiKey).getD ""
   let api : API := {
     model := model,
     baseUrl := url,
@@ -135,12 +165,11 @@ def getTogetherAPI : IO API := do
   }
   return api
 
-
-def getOpenAIAPI : IO API := do
-  let url        := (← IO.getEnv "LLMLEAN_ENDPOINT").getD "https://api.openai.com/v1/chat/completions"
-  let model      := (← IO.getEnv "LLMLEAN_MODEL").getD "gpt-4o"
-  let promptKind := (← IO.getEnv "LLMLEAN_PROMPT").getD "detailed"
-  let apiKey     := (← IO.getEnv "LLMLEAN_API_KEY").getD ""
+def getOpenAIAPI : CoreM API := do
+  let url        := (← Config.getEndpoint).getD "https://api.openai.com/v1/chat/completions"
+  let model      := (← Config.getModel).getD "gpt-4o"
+  let promptKind := (← Config.getPrompt).getD "detailed"
+  let apiKey     := (← Config.getApiKey).getD ""
   let api : API := {
     model := model,
     baseUrl := url,
@@ -150,11 +179,26 @@ def getOpenAIAPI : IO API := do
   }
   return api
 
-def getAPI : IO API := do
-  let apiKind  := (← IO.getEnv "LLMLEAN_API").getD "openai"
+def getAnthropicAPI : CoreM API := do
+  let url        := (← Config.getEndpoint).getD "https://api.anthropic.com/v1/messages"
+  let model      := (← Config.getModel).getD "claude-3-7-sonnet-20250219"
+  let promptKind := (← Config.getPrompt).getD "detailed"
+  let apiKey     := (← Config.getApiKey).getD ""
+  let api : API := {
+    model := model,
+    baseUrl := url,
+    kind := APIKind.Anthropic,
+    promptKind := getPromptKind promptKind,
+    key := apiKey
+  }
+  return api
+
+def getAPI : CoreM API := do
+  let apiKind  := (← Config.getApi).getD "openai"
   match apiKind with
   | "ollama" => getOllamaAPI
   | "together" => getTogetherAPI
+  | "anthropic" => getAnthropicAPI
   | _ => getOpenAIAPI
 
 def post {α β : Type} [ToJson α] [FromJson β] (req : α) (url : String) (apiKey : String): IO β := do
@@ -165,6 +209,8 @@ def post {α β : Type} [ToJson α] [FromJson β] (req : α) (url : String) (api
       "-H", "accept: application/json",
       "-H", "Content-Type: application/json",
       "-H", "Authorization: Bearer " ++ apiKey,
+      "-H", "x-api-key: " ++ apiKey,
+      "-H", "anthropic-version: 2023-06-01",
       "-d", (toJson req).pretty UInt64.size]
   }
   if out.exitCode != 0 then
@@ -251,11 +297,11 @@ Put the next tactic inside [TAC]...[/TAC].
 def makePromptsDetailed (context : String) (state : String) (pre: String) : List String :=
   makePromptsInstruct context state pre
 
-def makeQedPromptsFewShot (context : String) (state : String) : List String :=
+def makeQedPromptsFewShot (context : String) (_state : String) : List String :=
   let p1 := context
   [p1]
 
-def makeQedPromptsInstruct (context : String) (state : String) : List String :=
+def makeQedPromptsInstruct (context : String) (_state : String) : List String :=
   let p1 := "/- You are proving a theorem in Lean 4.
 You are given the following information:
 - The current file contents up to and including the theorem statement, inside [CTX]...[/CTX]
@@ -319,7 +365,7 @@ def filterGeneration (s: String) : Bool :=
   !(banned.any fun s' => (s.splitOn s').length > 1)
 
 def splitTac (text : String) : String :=
-  let text := text.replace "[TAC]" ""
+  let text := ((text.splitOn "[TAC]").tailD [text]).headD text
   match (text.splitOn "[/TAC]").head? with
   | some s => s.trim
   | none => text.trim
@@ -330,9 +376,12 @@ def parseResponseOllama (res: OllamaResponse) : String :=
 def parseTacticResponseOpenAI (res: OpenAIResponse) (pfx : String) : Array String :=
   (res.choices.map fun x => pfx ++ (splitTac x.message.content)).toArray
 
+def parseTacticResponseAnthropic (res: AnthropicResponse) (pfx : String) : Array String :=
+  (res.content.map fun x => pfx ++ (splitTac x.text)).toArray
+
 def tacticGenerationOllama (pfx : String) (prompts : List String)
 (api : API) (options : GenerationOptions) : IO $ Array (String × Float) := do
-  let mut results : HashSet String := HashSet.empty
+  let mut results : Std.HashSet String := Std.HashSet.empty
   for prompt in prompts do
     for i in List.range options.numSamples do
       let temperature := if i == 1 then 0.0 else options.temperature
@@ -350,7 +399,7 @@ def tacticGenerationOllama (pfx : String) (prompts : List String)
 
 def tacticGenerationOpenAI (pfx : String) (prompts : List String)
 (api : API) (options : GenerationOptions) : IO $ Array (String × Float) := do
-  let mut results : HashSet String := HashSet.empty
+  let mut results : Std.HashSet String := Std.HashSet.empty
   for prompt in prompts do
     let req : OpenAITacticGenerationRequest := {
       model := api.model,
@@ -370,6 +419,29 @@ def tacticGenerationOpenAI (pfx : String) (prompts : List String)
   let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
   return finalResults
 
+def tacticGenerationAnthropic (pfx : String) (prompts : List String)
+(api : API) (options : GenerationOptions) : IO $ Array (String × Float) := do
+  let mut results : Std.HashSet String := Std.HashSet.empty
+  for prompt in prompts do
+    for i in List.range options.numSamples do
+      let temperature := if i == 1 then 0.0 else options.temperature
+      let req : AnthropicTacticGenerationRequest := {
+        model := api.model,
+        messages := [
+          {
+            role := "user",
+            content := prompt
+          }
+        ],
+        temperature := temperature
+      }
+      let res : AnthropicResponse ← post req api.baseUrl api.key
+      for result in (parseTacticResponseAnthropic res pfx) do
+        results := results.insert result
+
+  let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
+  return finalResults
+
 def splitProof (text : String) : String :=
   let text := ((text.splitOn "[PROOF]").tailD [text]).headD text
   match (text.splitOn "[/PROOF]").head? with
@@ -382,9 +454,12 @@ def parseResponseQedOllama (res: OllamaResponse) : String :=
 def parseResponseQedOpenAI (res: OpenAIResponse) : Array String :=
   (res.choices.map fun x => (splitProof x.message.content)).toArray
 
+def parseResponseQedAnthropic (res: AnthropicResponse) : Array String :=
+  (res.content.map fun x => (splitProof x.text)).toArray
+
 def qedOllama (prompts : List String)
 (api : API) (options : GenerationOptionsQed) : IO $ Array (String × Float) := do
-  let mut results : HashSet String := HashSet.empty
+  let mut results : Std.HashSet String := Std.HashSet.empty
   for prompt in prompts do
     for i in List.range options.numSamples do
       let temperature := if i == 1 then 0.0 else options.temperature
@@ -402,7 +477,7 @@ def qedOllama (prompts : List String)
 
 def qedOpenAI (prompts : List String)
 (api : API) (options : GenerationOptionsQed) : IO $ Array (String × Float) := do
-  let mut results : HashSet String := HashSet.empty
+  let mut results : Std.HashSet String := Std.HashSet.empty
   for prompt in prompts do
     let req : OpenAIQedRequest := {
       model := api.model,
@@ -422,25 +497,44 @@ def qedOpenAI (prompts : List String)
   let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
   return finalResults
 
-def getGenerationOptions (api : API):  IO GenerationOptions := do
+def qedAnthropic (prompts : List String)
+(api : API) (options : GenerationOptionsQed) : IO $ Array (String × Float) := do
+  let mut results : Std.HashSet String := Std.HashSet.empty
+  for prompt in prompts do
+    for i in List.range options.numSamples do
+      let temperature := if i == 1 then 0.0 else options.temperature
+      let req : AnthropicQedRequest := {
+        model := api.model,
+        messages := [
+          {
+            role := "user",
+            content := prompt
+          }
+        ],
+        temperature := temperature
+      }
+      let res : AnthropicResponse ← post req api.baseUrl api.key
+      for result in (parseResponseQedAnthropic res) do
+        results := results.insert result
+
+  let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
+  return finalResults
+
+def getGenerationOptions (api : API) : CoreM GenerationOptions := do
   let defaultSamples := match api.kind with
   | APIKind.Ollama => 5
   | _ => 32
 
-  let defaultSamplesStr := match api.kind with
-  | APIKind.Ollama => "5"
-  | _ => "32"
-
-  let numSamples := match ((← IO.getEnv "LLMLEAN_NUMSAMPLES").getD defaultSamplesStr).toInt? with
-  | some n => n.toNat
-  | none => defaultSamples
+  let numSamples := match ← Config.getNumSamples with
+  | none | some 0 => defaultSamples
+  | some n => n
 
   let options : GenerationOptions := {
     numSamples := numSamples
   }
   return options
 
-def getQedGenerationOptions (api : API): IO GenerationOptionsQed := do
+def getQedGenerationOptions (api : API): CoreM GenerationOptionsQed := do
   let options ← getGenerationOptions api
   let options : GenerationOptionsQed := {
     numSamples := options.numSamples
@@ -449,7 +543,7 @@ def getQedGenerationOptions (api : API): IO GenerationOptionsQed := do
 
 def API.tacticGeneration
   (api : API) (tacticState : String) (context : String)
-  («prefix» : String) : IO $ Array (String × Float) := do
+  («prefix» : String) : CoreM $ Array (String × Float) := do
   let prompts := makePrompts api.promptKind context tacticState «prefix»
   let options ← getGenerationOptions api
   match api.kind with
@@ -459,9 +553,11 @@ def API.tacticGeneration
     tacticGenerationOpenAI «prefix» prompts api options
   | APIKind.OpenAI =>
     tacticGenerationOpenAI «prefix» prompts api options
+  | APIKind.Anthropic =>
+    tacticGenerationAnthropic «prefix» prompts api options
 
 def API.proofCompletion
-  (api : API) (tacticState : String) (context : String) : IO $ Array (String × Float) := do
+  (api : API) (tacticState : String) (context : String) : CoreM $ Array (String × Float) := do
   let prompts := makeQedPrompts api.promptKind context tacticState
   let options ← getQedGenerationOptions api
   match api.kind with
@@ -471,5 +567,7 @@ def API.proofCompletion
     qedOpenAI prompts api options
   | APIKind.OpenAI =>
     qedOpenAI prompts api options
+  | APIKind.Anthropic =>
+    qedAnthropic prompts api options
 
 end LLMlean
