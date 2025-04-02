@@ -113,7 +113,7 @@ def getApiKey : CoreM (Option String) := do
 def getNumSamples : CoreM (Option Nat) := do
   match llmlean.numSamples.get (← getOptions) with
   | 0 =>
-    match ← IO.getEnv "LLMLEAN_NUMSAMPLES" with
+    match ← IO.getEnv "LLMLEAN_NUM_SAMPLES" with
     | none => Option.map String.toNat! <$> getFromConfigFile `numSamples
     | some numSamples => return numSamples.toNat?
   | numSamples => return some numSamples
