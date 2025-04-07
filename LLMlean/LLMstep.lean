@@ -13,7 +13,7 @@ import LLMlean.API
 open Lean LLMlean
 
 /- Calls an LLM API with the given context, prefix and pretty-printed goal. -/
-def runSuggest (goal pre ctx: String) : IO (Array (String × Float)) := do
+def runSuggest (goal pre ctx: String) : CoreM (Array (String × Float)) := do
   let api ← getAPI
   let s ← api.tacticGeneration goal ctx pre
   return s
@@ -157,3 +157,6 @@ elab_rules : tactic
       addSuggestions tac pfx (← liftMetaMAtMain (llmStep pfx.getString ctx))
     | none =>
       addSuggestions tac pfx (← liftMetaMAtMain (llmStep pfx.getString ""))
+
+/-- Parse `llmstep` as `llmstep ""` -/
+macro "llmstep" : tactic => `(tactic| llmstep "")

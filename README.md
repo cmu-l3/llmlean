@@ -14,21 +14,30 @@ You can use an LLM running on your laptop, or an LLM from the Open AI API or Tog
 
 1. Get an [OpenAI API](https://openai.com/index/openai-api/) key.
 
-2. Set 1 environment variable:
+2. Modify `~/.config/llmlean/config.toml` (or `C:\Users\<Username>\AppData\Roaming\llmlean\config.toml` on Windows), and enter the following:
 
-```bash
-export LLMLEAN_API_KEY=your-openai-api-key
+```toml
+api = "openai"
+model = "gpt-4o"
+apiKey = "<your-openai-api-key>"
 ```
 
-To do so, add the export statement to the `~/.zshrc` file (on Mac) or `~/.bashrc` (Linux), and restart VS Code.
+(Alternatively, you may set the API key using the environment variable `LLMLEAN_API_KEY` or using `set_option llmlean.apiKey "<your-api-key>"`.)
+Similarly, to set up an Anthropic LLM, use
 
-3. Add `llmlean` to lakefile:
+```toml
+api = "anthropic"
+model = "claude-3-7-sonnet-20250219"
+apiKey = "<your-anthropic-api-key>"
+```
+
+1. Add `llmlean` to lakefile:
 ```lean
 require llmlean from git
   "https://github.com/cmu-l3/llmlean.git"
 ```
 
-4. Import:
+1. Import:
 ```lean
 import LLMlean
 ```
@@ -42,10 +51,11 @@ Now use a tactic described below.
 ollama pull wellecks/ntpctx-llama3-8b
 ```
 
-3. Set 2 environment variables:
-```bash
-export LLMLEAN_API=ollama
-export LLMLEAN_MODEL=wellecks/ntpctx-llama3-8b # model name from above
+3. Set 2 configuration variables in `~/.config/llmlean/config.toml`:
+
+```toml
+api = "ollama"
+model = "wellecks/ntpctx-llama3-8b" # model name from above
 ```
 
 Then do steps (3) and (4) above. Now use a tactic described below.
@@ -56,11 +66,11 @@ Then do steps (3) and (4) above. Now use a tactic described below.
 
 1. Get a [together.ai](https://www.together.ai/) API key.
 
-2. Set 2 environment variables:
+2. Set 2 configuration variables in `~/.config/llmlean/config.toml`:
 
-```bash
-export LLMLEAN_API=together
-export LLMLEAN_API_KEY=your-together-api-key
+```toml
+api = "together"
+apiKey = "<your-together-api-key>"
 ```
 
 Then do steps (3) and (4) above. Now use a tactic described below.
@@ -108,3 +118,12 @@ And using `llmqed` to make part of an existing proof simpler:
 
 Please see the following:
 - [Customization](docs/customization.md)
+
+
+## Testing
+Rebuild LLMLean with the config `test=on`:
+```sh
+lake -R -Ktest=on update
+lake build
+```
+Then manually check `llmlean` on the files under `LLMleanTest`.

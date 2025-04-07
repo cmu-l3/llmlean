@@ -10,15 +10,15 @@ import LLMlean.LLMstep
 open Lean LLMlean
 
 /- Calls an LLM API with the given context, prefix and pretty-printed goal. -/
-def runTactic (goal ctx: String) : IO (Array (String × Float)) := do
+def runTactic (goal ctx : String) : CoreM (Array (String × Float)) := do
   let api ← getAPI
   let s ← api.proofCompletion goal ctx
   return s
 
-def formatSuggestion (suggestion: String)
-(body : String.Pos)
-(start : String.Pos)
-(column : Nat):=
+def formatSuggestion (suggestion : String)
+    (body : String.Pos)
+    (start : String.Pos)
+    (column : Nat) :=
   let lines := (suggestion.splitOn "\n")
   let lines := [(lines.headD "").trim] ++ lines.tailD []
   let lines := lines.map fun (line : String) =>
@@ -45,9 +45,9 @@ def checkSuggestion' (s: String) : Lean.Elab.Tactic.TacticM CheckResult := do
             pure CheckResult.Valid
         catch _ =>
           pure CheckResult.Invalid
-      | Except.error e =>
+      | Except.error _ =>
         pure CheckResult.Invalid
-    catch e =>
+    catch _ =>
       pure CheckResult.Invalid
 
 
