@@ -32,6 +32,7 @@ deriving Inhabited, Repr
 
 
 structure GenerationOptionsOllama where
+  /-- Temperature represents the level of randomness/creativity in the model output, higher being more random. -/
   temperature : Float := 0.7
   «stop» : List String := ["[/TAC]"]
   /-- Maximum number of tokens to generate. `-1` means no limit. -/
@@ -221,8 +222,11 @@ def post {α β : Type} [ToJson α] [FromJson β] (req : α) (url : String) (api
     | throw $ IO.userError out.stdout
   return res
 
+/--
+See `makePrompts`.
+-/
 def makePromptsFewShot (context : String) (state : String) (pre: String) : List String :=
-  let p1 := "Given the Lean 4 tactic state, suggest a next tactic.
+  let p1 := s!"Given the Lean 4 tactic state, suggest a next tactic.
 Here are some examples:
 
 Tactic state:
@@ -264,19 +268,22 @@ rw [← h.gcd_eq_one]
 
 Tactic state:
 ---
-" ++ state ++ "
+{state}
 ---
 Next tactic:
 ---
-" ++ pre
+{pre}"
   let p2 := match pre with
   | "" => context
   | _  => p1
 
   [p1, p2]
 
+/--
+See `makePrompts`.
+-/
 def makePromptsInstruct (context : String) (state : String) (pre: String) : List String :=
-  let p1 := "/- You are proving a theorem in Lean 4.
+  let p1 := s!"/- You are proving a theorem in Lean 4.
 You are given the following information:
 - The file contents up to the current tactic, inside [CTX]...[/CTX]
 - The current proof state, inside [STATE]...[/STATE]
@@ -285,24 +292,33 @@ Your task is to generate the next tactic in the proof.
 Put the next tactic inside [TAC]...[/TAC].
 -/
 [CTX]
-" ++ context ++ "
+{context}
 [/CTX]
 [STATE]
-" ++ state ++ "
+{state}
 [/STATE]
 [TAC]
-" ++ pre
+{pre}"
   [p1]
 
+/--
+See `makePrompts`.
+-/
 def makePromptsDetailed (context : String) (state : String) (pre: String) : List String :=
   makePromptsInstruct context state pre
 
+/--
+See `makeQedPrompts`.
+-/
 def makeQedPromptsFewShot (context : String) (_state : String) : List String :=
   let p1 := context
   [p1]
 
+/--
+See `makeQedPrompts`.
+-/
 def makeQedPromptsInstruct (context : String) (_state : String) : List String :=
-  let p1 := "/- You are proving a theorem in Lean 4.
+  let p1 := s!"/- You are proving a theorem in Lean 4.
 You are given the following information:
 - The current file contents up to and including the theorem statement, inside [CTX]...[/CTX]
 
@@ -310,13 +326,16 @@ Your task is to generate the proof.
 Put the proof inside [PROOF]...[/PROOF]
 -/
 [CTX]
-" ++ context ++ "
+{context}
 [/CTX]
 [PROOF]"
   [p1]
 
+/--
+See `makeQedPrompts`.
+-/
 def makeQedPromptsDetailed (context : String) (state : String) : List String :=
-  let p1 := "/- You are proving a theorem in Lean 4.
+  let p1 := s!"/- You are proving a theorem in Lean 4.
 You are given the following information:
 - The file contents up to the current tactic, inside [CTX]...[/CTX]
 - The current proof state, inside [STATE]...[/STATE]
@@ -337,33 +356,48 @@ Therefore, make sure the proof is formatted as one tactic per line,
 with no additional comments or text.
 -/
 [CTX]
-" ++ context ++ "
+{context}
 [/CTX]
 [STATE]
-" ++ state ++ "
+{state}
 [/STATE]
 "
   [p1]
 
-
+/--
+Makes prompts for single tactic generation,
+given a `context` containing the file contents up to the tactic invocation,
+and a `state` containing the current proof state,
+and a `pre` string containing the prefix of the tactic to be generated.
+-/
 def makePrompts (promptKind : PromptKind) (context : String) (state : String) (pre: String) : List String :=
   match promptKind with
   | PromptKind.FewShot => makePromptsFewShot context state pre
   | PromptKind.Detailed => makePromptsDetailed context state pre
   | _ => makePromptsInstruct context state pre
 
-
+/--
+Makes prompts for the complete proof generation,
+given a `context` containing the file contents up to the tactic invocation,
+and a `state` containing the current proof state.
+-/
 def makeQedPrompts (promptKind : PromptKind) (context : String) (state : String) : List String :=
   match promptKind with
   | PromptKind.FewShot => makeQedPromptsFewShot context state
   | PromptKind.Detailed => makeQedPromptsDetailed context state
   | _ => makeQedPromptsInstruct context state
 
-
+/--
+Returns true if the string `s` contains any of the banned tactics, such as `sorry` and `admit`.
+-/
 def filterGeneration (s: String) : Bool :=
   let banned := ["sorry", "admit", "▅"]
   !(banned.any fun s' => (s.splitOn s').length > 1)
 
+/--
+Parses a tactic out of a response from the LLM.
+The tactic is expected to be enclosed in `[TAC]...[/TAC]` tags.
+-/
 def splitTac (text : String) : String :=
   let text := ((text.splitOn "[TAC]").tailD [text]).headD text
   match (text.splitOn "[/TAC]").head? with
@@ -442,6 +476,10 @@ def tacticGenerationAnthropic (pfx : String) (prompts : List String)
   let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
   return finalResults
 
+/--
+Parses a proof out of a response from the LLM.
+The proof is expected to be enclosed in `[PROOF]...[/PROOF]` tags.
+-/
 def splitProof (text : String) : String :=
   let text := ((text.splitOn "[PROOF]").tailD [text]).headD text
   match (text.splitOn "[/PROOF]").head? with
@@ -541,6 +579,9 @@ def getQedGenerationOptions (api : API): CoreM GenerationOptionsQed := do
   }
   return options
 
+/--
+Generates a list of tactics using the LLM API.
+-/
 def API.tacticGeneration
   (api : API) (tacticState : String) (context : String)
   («prefix» : String) : CoreM $ Array (String × Float) := do
