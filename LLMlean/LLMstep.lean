@@ -18,6 +18,13 @@ def runSuggest (goal pre ctx: String) : CoreM (Array (String × Float)) := do
   let s ← api.tacticGeneration goal ctx pre
   return s
 
+/- Calls an LLM API with the given context, prefix and pretty-printed goal. -/
+def runSuggestKimina (goal pre ctx: String) : CoreM (Array (String × Float)) := do
+  let api ← getOllamaKiminaAPI
+  let s ← api.tacticGeneration goal ctx pre
+  return s
+
+
 /- Display clickable suggestions in the VSCode Lean Infoview.
     When a suggestion is clicked, this widget replaces the `llmstep` call
     with the suggestion, and saves the call in an adjacent comment.
@@ -140,6 +147,13 @@ def llmStep (pre : String) (ctx : String) (g : MVarId) : MetaM (Array (String ×
   let pp := toString (← Meta.ppGoal g)
   runSuggest pp pre ctx
 
+/--
+Call the LLM on a goal, asking for suggestions beginning with a prefix.
+-/
+def llmStepKimina (pre : String) (ctx : String) (g : MVarId) : MetaM (Array (String × Float)) := do
+  let pp := toString (← Meta.ppGoal g)
+  runSuggestKimina pp pre ctx
+
 open Lean Elab Tactic
 
 /- `llmstep` tactic.
@@ -154,9 +168,24 @@ elab_rules : tactic
     | some range =>
       let src := (← getFileMap).source
       let ctx := src.extract src.toSubstring.startPos range.start
-      addSuggestions tac pfx (← liftMetaMAtMain (llmStep pfx.getString ctx))
+      addSuggestions tac pfx (← liftMetaMAtMain (llmStepKimina pfx.getString ctx))
     | none =>
-      addSuggestions tac pfx (← liftMetaMAtMain (llmStep pfx.getString ""))
+      addSuggestions tac pfx (← liftMetaMAtMain (llmStepKimina pfx.getString ""))
 
 /-- Parse `llmstep` as `llmstep ""` -/
 macro "llmstep" : tactic => `(tactic| llmstep "")
+
+/- `llmstepkimina` tactic. -/
+syntax "llmstepkimina" str: tactic
+elab_rules : tactic
+  | `(tactic | llmstepkimina%$tac $pfx:str) => do
+    match tac.getRange? with
+    | some range =>
+      let src := (← getFileMap).source
+      let ctx := src.extract src.toSubstring.startPos range.start
+      addSuggestions tac pfx (← liftMetaMAtMain (llmStepKimina pfx.getString ctx))
+    | none =>
+      addSuggestions tac pfx (← liftMetaMAtMain (llmStepKimina pfx.getString ""))
+
+/-- Parse `llmstepkimina` as `llmstepkimina ""` -/
+macro "llmstepkimina" : tactic => `(tactic| llmstepkimina "")

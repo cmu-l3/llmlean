@@ -61,10 +61,18 @@ def getConfigTable : IO (Option Lake.Toml.Table) := do
     return none
 
 open Lake Toml
+
+def DecodeM.run {α} (x : DecodeM α) : EStateM Empty (Array DecodeError) α := x
+
+def Result.getResult (x : EStateM.Result Empty (Array DecodeError) (Option String) ) : Option String × Array DecodeError :=
+  match x with
+  | .ok value _ => (value, #[])
+  | .error _ _ => (none, #[])
+
 def getFromConfigFile (key : Name) : IO (Option String) := do
   let table ← getConfigTable
   let table := table.get!
-  let (value, errors) := Id.run do StateT.run (s := #[]) do
+  let (value, errors) := Result.getResult $ EStateM.run (s := #[]) do DecodeM.run do
     let value : Option String ← table.tryDecode? key
     return value
   for e in errors do IO.eprintln e.msg
