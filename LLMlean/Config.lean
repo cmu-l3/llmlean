@@ -126,4 +126,30 @@ def getNumSamples : CoreM (Option Nat) := do
     | some numSamples => return numSamples.toNat?
   | numSamples => return some numSamples
 
+/-!
+## Data Structures for configuration options
+-/
+
+inductive APIKind : Type
+  | Ollama
+  | TogetherAI
+  | OpenAI
+  | Anthropic
+  deriving Inhabited, Repr
+
+inductive PromptKind : Type
+  | FewShot
+  | Instruction
+  | Reasoning
+  | MarkdownReasoning
+  deriving Inhabited, Repr
+
+structure API where
+  model : String
+  baseUrl : String
+  kind : APIKind := .Ollama
+  promptKind : PromptKind := .FewShot
+  key : String := ""
+deriving Inhabited, Repr
+
 end LLMlean.Config

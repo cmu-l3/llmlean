@@ -2,35 +2,9 @@
 import Lean
 import LLMlean.Config
 
-open Lean
+open Lean LLMlean.Config
 
 namespace LLMlean
-
-
-inductive APIKind : Type
-  | Ollama
-  | TogetherAI
-  | OpenAI
-  | Anthropic
-  deriving Inhabited, Repr
-
-
-inductive PromptKind : Type
-  | FewShot
-  | Instruction
-  | Reasoning
-  | MarkdownReasoning
-  deriving Inhabited, Repr
-
-
-structure API where
-  model : String
-  baseUrl : String
-  kind : APIKind := APIKind.Ollama
-  promptKind := PromptKind.FewShot
-  key : String := ""
-deriving Inhabited, Repr
-
 
 structure GenerationOptionsOllama where
   /-- Temperature represents the level of randomness/creativity in the model output, higher being more random. -/
@@ -773,7 +747,7 @@ def getQedGenerationOptions (api : API): CoreM GenerationOptionsQed := do
 /--
 Generates a list of tactics using the LLM API.
 -/
-def API.tacticGeneration
+def LLMlean.Config.API.tacticGeneration
   (api : API) (tacticState : String) (context : String)
   («prefix» : String) : CoreM $ Array (String × Float) := do
   let prompts := makePrompts api.promptKind context tacticState «prefix»
@@ -792,7 +766,7 @@ def API.tacticGeneration
     | APIKind.Anthropic =>
       tacticGenerationAnthropic «prefix» prompts api options
 
-def API.proofCompletion
+def LLMlean.Config.API.proofCompletion
   (api : API) (tacticState : String) (context : String) : CoreM $ Array (String × Float) := do
   let prompts := makeQedPrompts api.promptKind context tacticState
   let options ← getQedGenerationOptions api

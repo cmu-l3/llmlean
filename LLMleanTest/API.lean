@@ -1,6 +1,6 @@
 import LLMlean.API
 
-open LLMlean
+open LLMlean LLMlean.Config
 
 
 def markdownExample1 : String :=
