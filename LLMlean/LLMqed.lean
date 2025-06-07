@@ -11,7 +11,7 @@ open Lean LLMlean
 
 /- Calls an LLM API with the given context, prefix and pretty-printed goal. -/
 def runTactic (goal ctx : String) : CoreM (Array (String × Float)) := do
-  let api ← getAPI
+  let api ← getConfiguredAPI
   let s ← api.proofCompletion goal ctx
   return s
 
