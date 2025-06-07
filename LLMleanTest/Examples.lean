@@ -2,7 +2,7 @@ import Mathlib
 import LLMlean
 
 example {α : Type _} (r s t : Set α) : r ⊆ s → s ⊆ t → r ⊆ t := by
-  exact fun h1 h2 => h1.trans h2
+  sorry
 
 example (x y : ℕ) : x + y = y + x := by
   sorry

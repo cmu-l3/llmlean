@@ -62,21 +62,20 @@ def getConfigTable : IO (Option Lake.Toml.Table) := do
 
 open Lake Toml
 
-def DecodeM.run {α} (x : DecodeM α) : EStateM Empty (Array DecodeError) α := x
-
-def Result.getResult (x : EStateM.Result Empty (Array DecodeError) (Option String) ) : Option String × Array DecodeError :=
-  match x with
-  | .ok value _ => (value, #[])
-  | .error _ _ => (none, #[])
-
+/-- Access a value from the `config.toml` file, or print errors. -/
 def getFromConfigFile (key : Name) : IO (Option String) := do
   let table ← getConfigTable
   let table := table.get!
-  let (value, errors) := Result.getResult $ EStateM.run (s := #[]) do DecodeM.run do
-    let value : Option String ← table.tryDecode? key
+  let result := EStateM.run (s := #[]) do
+    let value : Option String ← table.decode? key
     return value
-  for e in errors do IO.eprintln e.msg
-  return value
+  match result with
+  | .ok value errors => do
+    for e in errors do IO.eprintln e.msg
+    return value
+  | .error () errors => do
+    for e in errors do IO.eprintln e.msg
+    return none
 
 def getApiKind : CoreM (Option String) := do
   match llmlean.api.get (← getOptions) with
