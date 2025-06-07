@@ -23,7 +23,7 @@ register_option llmlean.model : String := {
 
 register_option llmlean.prompt : String := {
   defValue := "",
-  descr := "If set, prompt type for the LLM (e.g. fewshot, detailed, instruction)"
+  descr := "If set, prompt kind for the LLM (e.g. fewshot, reasoning, instruction)"
 }
 
 register_option llmlean.apiKey : String := {
@@ -78,7 +78,7 @@ def getFromConfigFile (key : Name) : IO (Option String) := do
   for e in errors do IO.eprintln e.msg
   return value
 
-def getApi : CoreM (Option String) := do
+def getApiKind : CoreM (Option String) := do
   match llmlean.api.get (← getOptions) with
   | "" =>
     match ← IO.getEnv "LLMLEAN_API" with
@@ -102,7 +102,7 @@ def getModel : CoreM (Option String) := do
     | some model => return some model
   | model => return some model
 
-def getPrompt : CoreM (Option String) := do
+def getPromptKind : CoreM (Option String) := do
   match llmlean.prompt.get (← getOptions) with
   | "" =>
     match ← IO.getEnv "LLMLEAN_PROMPT" with

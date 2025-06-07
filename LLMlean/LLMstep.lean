@@ -12,15 +12,14 @@ import LLMlean.API
 
 open Lean LLMlean
 
-/- Calls an LLM API with the given context, prefix and pretty-printed goal. -/
-def runSuggest (goal pre ctx: String) : CoreM (Array (String × Float)) := do
-  let api ← getAPI
-  let s ← api.tacticGeneration goal ctx pre
-  return s
-
-/- Calls an LLM API with the given context, prefix and pretty-printed goal. -/
-def runSuggestKimina (goal pre ctx: String) : CoreM (Array (String × Float)) := do
-  let api ← getOllamaKiminaAPI
+/- Calls an LLM API with the given context, prefix and pretty-printed goal.
+  Optionally allows to provide a specific API for a model to call. -/
+def runSuggest (goal pre ctx: String) (api : Option Config.API := none) :
+    CoreM (Array (String × Float)) := do
+  let api : Config.API ← match api with
+    | some api => pure api
+    -- if the API is provided, use the one found in the configuration.
+    | none => getConfiguredAPI
   let s ← api.tacticGeneration goal ctx pre
   return s
 
@@ -147,13 +146,6 @@ def llmStep (pre : String) (ctx : String) (g : MVarId) : MetaM (Array (String ×
   let pp := toString (← Meta.ppGoal g)
   runSuggest pp pre ctx
 
-/--
-Call the LLM on a goal, asking for suggestions beginning with a prefix.
--/
-def llmStepKimina (pre : String) (ctx : String) (g : MVarId) : MetaM (Array (String × Float)) := do
-  let pp := toString (← Meta.ppGoal g)
-  runSuggestKimina pp pre ctx
-
 open Lean Elab Tactic
 
 /- `llmstep` tactic.
@@ -163,29 +155,16 @@ open Lean Elab Tactic
     llmstep "apply Continuous" -/
 syntax "llmstep" str: tactic
 elab_rules : tactic
-  | `(tactic | llmstep%$tac $pfx:str) => do
+  | `(tactic | llmstep%$tac $pfx:str ) => do
     match tac.getRange? with
     | some range =>
+      -- Get the source context from the file from which the tactic was called.
       let src := (← getFileMap).source
+      -- Extract the context, from the start of the file to the start of tactic call.
       let ctx := src.extract src.toSubstring.startPos range.start
-      addSuggestions tac pfx (← liftMetaMAtMain (llmStepKimina pfx.getString ctx))
+      addSuggestions tac pfx (← liftMetaMAtMain (llmStep pfx.getString ctx))
     | none =>
-      addSuggestions tac pfx (← liftMetaMAtMain (llmStepKimina pfx.getString ""))
+      addSuggestions tac pfx (← liftMetaMAtMain (llmStep pfx.getString ""))
 
 /-- Parse `llmstep` as `llmstep ""` -/
 macro "llmstep" : tactic => `(tactic| llmstep "")
-
-/- `llmstepkimina` tactic. -/
-syntax "llmstepkimina" str: tactic
-elab_rules : tactic
-  | `(tactic | llmstepkimina%$tac $pfx:str) => do
-    match tac.getRange? with
-    | some range =>
-      let src := (← getFileMap).source
-      let ctx := src.extract src.toSubstring.startPos range.start
-      addSuggestions tac pfx (← liftMetaMAtMain (llmStepKimina pfx.getString ctx))
-    | none =>
-      addSuggestions tac pfx (← liftMetaMAtMain (llmStepKimina pfx.getString ""))
-
-/-- Parse `llmstepkimina` as `llmstepkimina ""` -/
-macro "llmstepkimina" : tactic => `(tactic| llmstepkimina "")

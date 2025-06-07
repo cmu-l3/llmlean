@@ -115,11 +115,12 @@ def getPromptKind (stringArg: String) : PromptKind :=
   | "markdown" => PromptKind.MarkdownReasoning
   | _ => PromptKind.Instruction
 
-def getOllamaAPI : CoreM API := do
-  let url        := (← Config.getEndpoint).getD "http://localhost:11434/api/generate"
-  let model      := (← Config.getModel).getD "wellecks/ntpctx-llama3-8b"
-  let promptKind := (← Config.getPrompt).getD "instruction"
-  let apiKey     := (← Config.getApiKey).getD ""
+/-- Gets the API for the miniCTX model, without configuration. -/
+def getCTXOllamaAPI : CoreM API := do
+  let url        := "http://localhost:11434/api/generate"
+  let model      := "wellecks/ntpctx-llama3-8b"
+  let promptKind := "instruction"
+  let apiKey     := ""
   let api : API := {
     model := model,
     baseUrl := url,
@@ -129,8 +130,9 @@ def getOllamaAPI : CoreM API := do
   }
   return api
 
-def getOllamaKiminaAPI : CoreM API := do
-  let url        := (← Config.getEndpoint).getD "http://localhost:11434/api/generate"
+/-- Gets the API for the 1.5B Kimina model, without configuration. -/
+def getKiminaOllamaSmallBAPI : CoreM API := do
+  let url        := "http://localhost:11434/api/generate"
   let model      := "BoltonBailey/Kimina-Prover-Preview-Distill-1.5B"
   let promptKind := "markdown"
   let apiKey     := ""
@@ -143,10 +145,41 @@ def getOllamaKiminaAPI : CoreM API := do
   }
   return api
 
-def getTogetherAPI : CoreM API := do
+/-- Gets the API for the 7B Kimina model, without configuration. -/
+def getKiminaOllamaMediumAPI : CoreM API := do
+  let url        := "http://localhost:11434/api/generate"
+  let model      := "BoltonBailey/Kimina-Prover-Preview-7B"
+  let promptKind := "markdown"
+  let apiKey     := ""
+  let api : API := {
+    model := model,
+    baseUrl := url,
+    kind := APIKind.Ollama,
+    promptKind := getPromptKind promptKind,
+    key := apiKey
+  }
+  return api
+
+/-- Gets an Ollama API, with details coming either from environment variables or the contents of the `config.toml` file. -/
+def getConfiguredOllamaAPI : CoreM API := do
+  let url        := (← Config.getEndpoint).getD "http://localhost:11434/api/generate"
+  let model      := (← Config.getModel).getD "wellecks/ntpctx-llama3-8b"
+  let promptKind := (← Config.getPromptKind).getD "instruction"
+  let apiKey     := (← Config.getApiKey).getD ""
+  let api : API := {
+    model := model,
+    baseUrl := url,
+    kind := APIKind.Ollama,
+    promptKind := getPromptKind promptKind,
+    key := apiKey
+  }
+  return api
+
+/-- Gets a TogetherAI API, with details coming either from environment variables or the contents of the `config.toml` file. -/
+def getConfiguredTogetherAPI : CoreM API := do
   let url        := (← Config.getEndpoint).getD "https://api.together.xyz/v1/chat/completions"
   let model      := (← Config.getModel).getD "Qwen/Qwen2.5-72B-Instruct-Turbo"
-  let promptKind := (← Config.getPrompt).getD "detailed"
+  let promptKind := (← Config.getPromptKind).getD "detailed"
   let apiKey     := (← Config.getApiKey).getD ""
   let api : API := {
     model := model,
@@ -157,10 +190,11 @@ def getTogetherAPI : CoreM API := do
   }
   return api
 
-def getOpenAIAPI : CoreM API := do
+/-- Gets an OpenAI API, with details coming either from environment variables or the contents of the `config.toml` file. -/
+def getConfiguredOpenAIAPI : CoreM API := do
   let url        := (← Config.getEndpoint).getD "https://api.openai.com/v1/chat/completions"
   let model      := (← Config.getModel).getD "gpt-4o"
-  let promptKind := (← Config.getPrompt).getD "detailed"
+  let promptKind := (← Config.getPromptKind).getD "detailed"
   let apiKey     := (← Config.getApiKey).getD ""
   let api : API := {
     model := model,
@@ -171,10 +205,11 @@ def getOpenAIAPI : CoreM API := do
   }
   return api
 
-def getAnthropicAPI : CoreM API := do
+/-- Gets an Anthropic API, with details coming either from environment variables or the contents of the `config.toml` file. -/
+def getConfiguredAnthropicAPI : CoreM API := do
   let url        := (← Config.getEndpoint).getD "https://api.anthropic.com/v1/messages"
   let model      := (← Config.getModel).getD "claude-3-7-sonnet-20250219"
-  let promptKind := (← Config.getPrompt).getD "detailed"
+  let promptKind := (← Config.getPromptKind).getD "detailed"
   let apiKey     := (← Config.getApiKey).getD ""
   let api : API := {
     model := model,
@@ -185,15 +220,15 @@ def getAnthropicAPI : CoreM API := do
   }
   return api
 
-/-- Read API kind fron config file -/
-def getAPI : CoreM API := do
-  let apiKind := (← Config.getApi).getD "ollama"
+/-- Gets the configured API, with details coming either from environment variables or the contents of the `config.toml` file. -/
+def getConfiguredAPI : CoreM API := do
+  let apiKind := (← Config.getApiKind).getD "ollama"
   match apiKind with
-  | "ollama" => getOllamaAPI
-  | "together" => getTogetherAPI
-  | "anthropic" => getAnthropicAPI
-  | "openai" => getOpenAIAPI
-  | _ => getOllamaAPI -- This should throw an error of some kind.
+  | "ollama" => getConfiguredOllamaAPI
+  | "together" => getConfiguredTogetherAPI
+  | "anthropic" => getConfiguredAnthropicAPI
+  | "openai" => getConfiguredOpenAIAPI
+  | _ => getConfiguredOllamaAPI -- TODO: This should throw an error of some kind.
 
 def post {α β : Type} [ToJson α] [FromJson β] (req : α) (url : String) (apiKey : String): IO β := do
   let out ← IO.Process.output {

@@ -43,24 +43,32 @@ info: true
 #guard_msgs in
 #eval getTacticFromBlockContext "import Mathlib\ntheorem foo (a b : ℕ) : a + a + b = a + b + a := by" codeBlockExample1 == "ring"
 
+-- #eval do
+--   let api : API ← getConfiguredAPI
+--   IO.println (reprStr api)
+--   let context := "import Mathlib\ntheorem foo (a b : ℕ) : a + a + b = a + b + a := by "
+--   let tacticState := "a b : ℕ\n⊢  a + a + b = a + b + a"
+--   let pref := ""
+--   let res ← API.tacticGeneration api tacticState context pref
+--   for r in res do
+--     IO.println r
 
+-- #eval do
+--   let api : API ← getKiminaOllama1pt5BAPI
+--   IO.println (reprStr api)
+--   let context := "import Mathlib\ntheorem foo (a b : ℕ) : a + a + b = a + b + a := by "
+--   let tacticState := "a b : ℕ\n⊢  a + a + b = a + b + a"
+--   let pref := ""
+--   let res ← API.tacticGeneration api tacticState context pref
+--   for r in res do
+--     IO.println r
 
-#eval do
-  let api : API ← getAPI
-  IO.println (reprStr api)
-  let context := "import Mathlib\ntheorem foo (a b : ℕ) : a + a + b = a + b + a := by "
-  let tacticState := "a b : ℕ\n⊢  a + a + b = a + b + a"
-  let pref := ""
-  let res ← API.tacticGeneration api tacticState context pref
-  for r in res do
-    IO.println r
-
-#eval do
-  let api : API ← getOllamaKiminaAPI
-  IO.println (reprStr api)
-  let context := "import Mathlib\ntheorem foo (a b : ℕ) : a + a + b = a + b + a := by "
-  let tacticState := "a b : ℕ\n⊢  a + a + b = a + b + a"
-  let pref := ""
-  let res ← API.tacticGeneration api tacticState context pref
-  for r in res do
-    IO.println r
+-- #eval do
+--   let api : API ← getCTXOllamaAPI
+--   IO.println (reprStr api)
+--   let context := "import Mathlib\ntheorem foo (a b : ℕ) : a + a + b = a + b + a := by "
+--   let tacticState := "a b : ℕ\n⊢  a + a + b = a + b + a"
+--   let pref := ""
+--   let res ← API.tacticGeneration api tacticState context pref
+--   for r in res do
+--     IO.println r
