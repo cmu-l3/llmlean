@@ -555,7 +555,7 @@ def getTacticFromBlockContext (context : String) (block : String) : String := Id
   else
     return s!"Did not find context: \n\n{context}\n\n in \n\n{block}\n\n"
 
-def parseResponseOllamaKimina (context : String) (res: OllamaResponse) : List String := Id.run do
+def parseResponseOllamaKimina (_context : String) (res: OllamaResponse) : List String := Id.run do
   let blocks := getMarkdownLeanCodeBlocks res.response
   let mut results : List String := []
   for block in blocks do
@@ -570,9 +570,9 @@ def parseTacticResponseOpenAI (res: OpenAIResponse) (pfx : String) : Array Strin
 def parseTacticResponseAnthropic (res: AnthropicResponse) (pfx : String) : Array String :=
   (res.content.map fun x => pfx ++ (splitTac x.text)).toArray
 
-def tacticGenerationOllamaKimina (pfx : String) (context : String) (prompts : List String)
+def tacticGenerationOllamaKimina (_pfx : String) (context : String) (prompts : List String)
 (api : API) (options : GenerationOptions) : IO $ Array (String × Float) := do
-  let mut results : Std.HashSet String := Std.HashSet.empty
+  let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
   for prompt in prompts do
     for i in List.range options.numSamples do
       let temperature := if i == 1 then 0.0 else options.temperature
@@ -591,7 +591,7 @@ def tacticGenerationOllamaKimina (pfx : String) (context : String) (prompts : Li
 
 def tacticGenerationOllama (pfx : String) (prompts : List String)
 (api : API) (options : GenerationOptions) : IO $ Array (String × Float) := do
-  let mut results : Std.HashSet String := Std.HashSet.empty
+  let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
   for prompt in prompts do
     for i in List.range options.numSamples do
       let temperature := if i == 1 then 0.0 else options.temperature
@@ -609,7 +609,7 @@ def tacticGenerationOllama (pfx : String) (prompts : List String)
 
 def tacticGenerationOpenAI (pfx : String) (prompts : List String)
 (api : API) (options : GenerationOptions) : IO $ Array (String × Float) := do
-  let mut results : Std.HashSet String := Std.HashSet.empty
+  let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
   for prompt in prompts do
     let req : OpenAITacticGenerationRequest := {
       model := api.model,
@@ -631,7 +631,7 @@ def tacticGenerationOpenAI (pfx : String) (prompts : List String)
 
 def tacticGenerationAnthropic (pfx : String) (prompts : List String)
 (api : API) (options : GenerationOptions) : IO $ Array (String × Float) := do
-  let mut results : Std.HashSet String := Std.HashSet.empty
+  let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
   for prompt in prompts do
     for i in List.range options.numSamples do
       let temperature := if i == 1 then 0.0 else options.temperature
@@ -679,7 +679,7 @@ def parseResponseQed_from_context (context : String) (res : OllamaResponse) : St
 
 def qedOllama (prompts : List String)
 (api : API) (options : GenerationOptionsQed) : IO $ Array (String × Float) := do
-  let mut results : Std.HashSet String := Std.HashSet.empty
+  let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
   for prompt in prompts do
     for i in List.range options.numSamples do
       let temperature := if i == 1 then 0.0 else options.temperature
@@ -697,7 +697,7 @@ def qedOllama (prompts : List String)
 
 def qedOllamaKimina (prompts : List String) (context : String)
 (api : API) (options : GenerationOptionsQed) : IO $ Array (String × Float) := do
-  let mut results : Std.HashSet String := Std.HashSet.empty
+  let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
   for prompt in prompts do
     for i in List.range options.numSamples do
       let temperature := if i == 1 then 0.0 else options.temperature
@@ -715,7 +715,7 @@ def qedOllamaKimina (prompts : List String) (context : String)
 
 def qedOpenAI (prompts : List String)
 (api : API) (options : GenerationOptionsQed) : IO $ Array (String × Float) := do
-  let mut results : Std.HashSet String := Std.HashSet.empty
+  let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
   for prompt in prompts do
     let req : OpenAIQedRequest := {
       model := api.model,
@@ -737,7 +737,7 @@ def qedOpenAI (prompts : List String)
 
 def qedAnthropic (prompts : List String)
 (api : API) (options : GenerationOptionsQed) : IO $ Array (String × Float) := do
-  let mut results : Std.HashSet String := Std.HashSet.empty
+  let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
   for prompt in prompts do
     for i in List.range options.numSamples do
       let temperature := if i == 1 then 0.0 else options.temperature
