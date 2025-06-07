@@ -60,6 +60,7 @@ model = "wellecks/ntpctx-llama3-8b" # model name from above
 
 Then do steps (3) and (4) above. Now use a tactic described below.
 
+Note that there are multiple Lean models available for download from Ollama. You can find a list of some these models and how to set configuration variables for them in the [Ollama Models](ollama-models.md) document.
 
 
 #### Option 3: LLM in the cloud (together.ai):
