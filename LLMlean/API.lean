@@ -526,16 +526,12 @@ def getTacticFromBlockContext (context : String) (block : String) : String := Id
     return s!"Did not find context: \n\n{context}\n\n in \n\n{block}\n\n"
 
 def parseResponseOllamaKimina (_context : String) (res: OllamaResponse) : List String := Id.run do
-  -- Debug: log the raw response
-  dbg_trace s!"Kimina raw response: {res.response}"
   let blocks := getMarkdownLeanCodeBlocks res.response
-  dbg_trace s!"Found {blocks.length} code blocks"
   let mut results : List String := []
   for block in blocks do
     for line in (block.splitOn "\n") do
       if line.trim.length > 0 then
         results := results ++ [line.trim]
-  dbg_trace s!"Parsed tactics: {results}"
   return results
 
 def parseTacticResponseOpenAI (res: OpenAIResponse) (pfx : String) : Array String :=
