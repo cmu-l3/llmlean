@@ -21,6 +21,10 @@ def markdownExample1 : String :=
   "  sorry\n" ++
   "```\n"
 
+def contextExample1 : String :=
+  "import Mathlib\n" ++
+  "theorem foo (a b : ℕ) : a + a + b = a + b + a := by\n"
+
 def codeBlockExample1 : String :=
   "import Mathlib\n" ++
   "theorem foo (a b : ℕ) : a + a + b = a + b + a := by\n" ++
@@ -37,38 +41,26 @@ info: true
 #guard_msgs in
 #eval getMarkdownLeanCodeBlocks markdownExample1 == [codeBlockExample1, codeBlockExample2]
 
+-- Test `getTacticFromBlockContext`
 /--
 info: true
 -/
 #guard_msgs in
 #eval getTacticFromBlockContext "import Mathlib\ntheorem foo (a b : ℕ) : a + a + b = a + b + a := by" codeBlockExample1 == "ring"
 
+-- Test `parseResponseQedOllamaMarkdown`
+/--
+info: "ring"
+-/
+#guard_msgs in
+#eval parseResponseQedOllamaMarkdown contextExample1 markdownExample1
+
 -- #eval do
 --   let api : API ← getConfiguredAPI
 --   IO.println (reprStr api)
 --   let context := "import Mathlib\ntheorem foo (a b : ℕ) : a + a + b = a + b + a := by "
 --   let tacticState := "a b : ℕ\n⊢  a + a + b = a + b + a"
---   let pref := ""
---   let res ← API.tacticGeneration api tacticState context pref
---   for r in res do
---     IO.println r
-
--- #eval do
---   let api : API ← getKiminaOllama1pt5BAPI
---   IO.println (reprStr api)
---   let context := "import Mathlib\ntheorem foo (a b : ℕ) : a + a + b = a + b + a := by "
---   let tacticState := "a b : ℕ\n⊢  a + a + b = a + b + a"
---   let pref := ""
---   let res ← API.tacticGeneration api tacticState context pref
---   for r in res do
---     IO.println r
-
--- #eval do
---   let api : API ← getCTXOllamaAPI
---   IO.println (reprStr api)
---   let context := "import Mathlib\ntheorem foo (a b : ℕ) : a + a + b = a + b + a := by "
---   let tacticState := "a b : ℕ\n⊢  a + a + b = a + b + a"
---   let pref := ""
---   let res ← API.tacticGeneration api tacticState context pref
+--   let prefix_ := ""
+--   let res ← API.proofCompletion api tacticState context
 --   for r in res do
 --     IO.println r
