@@ -682,7 +682,7 @@ def qedOllamaMarkdown (prompts : List String) (context : String)
         model := api.model,
         prompt := prompt,
         stream := false,
-        options := { temperature := temperature, stop := options.stop }
+        options := { temperature := temperature, stop := [] }
       }
       let res : OllamaResponse ← post req api.baseUrl api.key
       results := results.insert ((parseResponseQedOllamaMarkdown context res.response))
