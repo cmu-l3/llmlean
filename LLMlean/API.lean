@@ -120,52 +120,6 @@ def getResponseFormat (stringArg: String) : ResponseFormat :=
   | "markdown" => ResponseFormat.Markdown
   | _ => ResponseFormat.Standard
 
-/-- Gets the API for the miniCTX model, without configuration. -/
-def getCTXOllamaAPI : CoreM API := do
-  let url        := "http://localhost:11434/api/generate"
-  let model      := "wellecks/ntpctx-llama3-8b"
-  let promptKind := "instruction"
-  let apiKey     := ""
-  let api : API := {
-    model := model,
-    baseUrl := url,
-    kind := APIKind.Ollama,
-    promptKind := getPromptKind promptKind,
-    key := apiKey
-  }
-  return api
-
-/-- Gets the API for the 1.5B Kimina model, without configuration. -/
-def getKiminaOllamaSmallBAPI : CoreM API := do
-  let url        := "http://localhost:11434/api/generate"
-  let model      := "BoltonBailey/Kimina-Prover-Preview-Distill-1.5B"
-  let promptKind := "markdown"
-  let apiKey     := ""
-  let api : API := {
-    model := model,
-    baseUrl := url,
-    kind := APIKind.Ollama,
-    promptKind := getPromptKind promptKind,
-    responseFormat := ResponseFormat.Markdown,
-    key := apiKey
-  }
-  return api
-
-/-- Gets the API for the 7B Kimina model, without configuration. -/
-def getKiminaOllamaMediumAPI : CoreM API := do
-  let url        := "http://localhost:11434/api/generate"
-  let model      := "BoltonBailey/Kimina-Prover-Preview-7B"
-  let promptKind := "markdown"
-  let apiKey     := ""
-  let api : API := {
-    model := model,
-    baseUrl := url,
-    kind := APIKind.Ollama,
-    promptKind := getPromptKind promptKind,
-    responseFormat := ResponseFormat.Markdown,
-    key := apiKey
-  }
-  return api
 
 /-- Gets an Ollama API, with details coming either from environment variables or the contents of the `config.toml` file. -/
 def getConfiguredOllamaAPI : CoreM API := do
