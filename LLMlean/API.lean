@@ -333,7 +333,7 @@ In summary, your output should be of the form:
 See `makePrompts`.
 -/
 def makePromptsMarkdownReasoning (context : String) (state : String) (pre: String) : List String :=
-  let p1 := s!"/- You are proving a theorem in Lean 4.
+  let p1 := s!"You are proving a theorem in Lean 4.
 You are given the following information:
 
 The file contents up to the current tactic are as follows:
@@ -417,7 +417,7 @@ with no additional comments or text.
 See `makeQedPrompts`.
 -/
 def makeQedPromptsMarkdownReasoning (context : String) (state : String) : List String :=
-  let p1 := s!"/- You are proving a theorem in Lean 4.
+  let p1 := s!"You are proving a theorem in Lean 4.
 
 You are given the following information:
 The file contents up to the current tactic are as follows:
