@@ -9,7 +9,7 @@ namespace LLMlean
 structure GenerationOptionsOllama where
   /-- Temperature represents the level of randomness/creativity in the model output, higher being more random. -/
   temperature : Float := 0.7
-  «stop» : List String := ["[/TAC]"]
+  «stop» : List String := ["[/TAC]", "[/PROOF]", "</think>"]
   /-- Maximum number of tokens to generate. `-1` means no limit. -/
   num_predict : Int := 200
 deriving ToJson
@@ -18,12 +18,14 @@ structure GenerationOptions where
   temperature : Float := 0.7
   numSamples : Nat := 10
   «stop» : List String := ["\n", "[/TAC]"]
+  maxTokens : Int := 200
 deriving ToJson
 
 structure GenerationOptionsQed where
   temperature : Float := 0.7
   numSamples : Nat := 10
-  «stop» : List String := ["\n\n"]
+  «stop» : List String := ["[/PROOF]", "</think>"]
+  maxTokens : Int := 2048
 deriving ToJson
 
 structure OllamaTacticGenerationRequest where
@@ -350,6 +352,7 @@ Generate this by writing a markdown file with the completed line, including the 
 in a markdown code block.
 
 If you find it helpful, you can precede the proof with brief thoughts.
+
 "
   match pre with
   | "" => [p1]
@@ -427,16 +430,16 @@ The file contents up to the current tactic are as follows:
 The current proof state is as follows:
 {state}
 Your task is to generate the proof.
-Generate this by writing a markdown file with the completed line, including the context of the file before it
+Generate this by writing a markdown file with the completed proof, including the context of the file before it
 in a markdown code block.
 
-For example, you can write something along the lines of
-```tactics
-{context}
+IMPORTANT: you must end by writing your full proof in the format:
+```lean4
 <... your proof here...>
 ```
 
 If you find it helpful, you can precede the proof with brief thoughts, outside the tactic blocks.
+IMPORTANT: Once you have written a complete proof, end with </think>.
 "
   [p1]
 
@@ -550,7 +553,10 @@ def tacticGenerationOllamaMarkdown (_pfx : String) (context : String) (prompts :
         model := api.model,
         prompt := prompt,
         stream := false,
-        options := { temperature := temperature }
+        options := {
+          temperature := temperature,
+          num_predict := options.maxTokens
+        }
       }
       let res : OllamaResponse ← post req api.baseUrl api.key
       for tactic in (parseTacticResponseOllamaMarkdown context res) do
@@ -569,7 +575,10 @@ def tacticGenerationOllama (pfx : String) (prompts : List String)
         model := api.model,
         prompt := prompt,
         stream := false,
-        options := { temperature := temperature }
+        options := {
+          temperature := temperature,
+          num_predict := options.maxTokens
+        }
       }
       let res : OllamaResponse ← post req api.baseUrl api.key
       results := results.insert (pfx ++ (parseResponseOllama res))
@@ -642,17 +651,33 @@ def parseResponseQedAnthropic (res: AnthropicResponse) : Array String :=
   (res.content.map fun x => (splitProof x.text)).toArray
 
 /--
-A response parser that assumes the LLM will repeat the context before the proof.
+Extracts proof from markdown response by finding the last code block
+and extracting content after the context.
 -/
-def parseResponseQedOllamaMarkdown (context : String) (response : String) : String := Id.run do
-  -- Split the response by the context
-  let split_context := (response.splitOn context)
-  let post_context := split_context[1]?.getD ""
-  -- Remove the closing ``` and anything after it
-  let post_context := post_context.splitOn "```"
-  let post_context := post_context.headD ""
-  let post_context := post_context.trim
-  post_context
+def extractProofFromMarkdownResponse (context : String) (response : String) : Option String := do
+  let blocks := getMarkdownLeanCodeBlocks response
+  let lastBlock ← blocks.getLast?
+
+  -- Try to find where the context ends in the block
+  -- First try: split by the entire context
+  let splitByFullContext := lastBlock.splitOn context
+  if splitByFullContext.length > 1 then
+    -- Found the full context, return everything after it
+    let proof := splitByFullContext[1]!.trim
+    return proof
+
+  -- Second try: find the last non-empty line of context and split by that
+  let contextLines := context.splitOn "\n"
+  let lastContextLine := (contextLines.filter (fun x => x.trim.length > 0)).getLast?.getD ""
+  if lastContextLine.length > 0 then
+    let splitByLastLine := lastBlock.splitOn lastContextLine
+    if splitByLastLine.length > 1 then
+      -- Found the last context line, return everything after it
+      let proof := splitByLastLine[1]!.trim
+      return proof
+
+  -- If we can't find the context, return the whole block
+  some lastBlock.trim
 
 def qedOllama (prompts : List String)
 (api : API) (options : GenerationOptionsQed) : IO $ Array (String × Float) := do
@@ -664,7 +689,11 @@ def qedOllama (prompts : List String)
         model := api.model,
         prompt := prompt,
         stream := false,
-        options := { temperature := temperature, stop := options.stop }
+        options := {
+          temperature := temperature,
+          stop := options.stop,
+          num_predict := options.maxTokens
+        }
       }
       let res : OllamaResponse ← post req api.baseUrl api.key
       results := results.insert (parseResponseQedOllama res)
@@ -682,10 +711,15 @@ def qedOllamaMarkdown (prompts : List String) (context : String)
         model := api.model,
         prompt := prompt,
         stream := false,
-        options := { temperature := temperature, stop := options.stop }
+        options := {
+          temperature := temperature,
+          stop := options.stop,
+          num_predict := options.maxTokens}
       }
       let res : OllamaResponse ← post req api.baseUrl api.key
-      results := results.insert ((parseResponseQedOllamaMarkdown context res.response))
+      match extractProofFromMarkdownResponse context res.response with
+      | some proof => results := results.insert proof
+      | none => results := results
 
   let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
   return finalResults
