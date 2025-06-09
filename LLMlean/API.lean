@@ -525,7 +525,7 @@ def getTacticFromBlockContext (context : String) (block : String) : String := Id
   else
     return s!"Did not find context: \n\n{context}\n\n in \n\n{block}\n\n"
 
-def parseResponseOllamaKimina (_context : String) (res: OllamaResponse) : List String := Id.run do
+def parseTacticResponseOllamaMarkdown (_context : String) (res: OllamaResponse) : List String := Id.run do
   let blocks := getMarkdownLeanCodeBlocks res.response
   let mut results : List String := []
   for block in blocks do
@@ -540,7 +540,7 @@ def parseTacticResponseOpenAI (res: OpenAIResponse) (pfx : String) : Array Strin
 def parseTacticResponseAnthropic (res: AnthropicResponse) (pfx : String) : Array String :=
   (res.content.map fun x => pfx ++ (splitTac x.text)).toArray
 
-def tacticGenerationOllamaKimina (_pfx : String) (context : String) (prompts : List String)
+def tacticGenerationOllamaMarkdown (_pfx : String) (context : String) (prompts : List String)
 (api : API) (options : GenerationOptions) : IO $ Array (String × Float) := do
   let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
   for prompt in prompts do
@@ -553,7 +553,7 @@ def tacticGenerationOllamaKimina (_pfx : String) (context : String) (prompts : L
         options := { temperature := temperature }
       }
       let res : OllamaResponse ← post req api.baseUrl api.key
-      for tactic in (parseResponseOllamaKimina context res) do
+      for tactic in (parseTacticResponseOllamaMarkdown context res) do
         results := results.insert (tactic)
 
   let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
@@ -642,10 +642,17 @@ def parseResponseQedAnthropic (res: AnthropicResponse) : Array String :=
   (res.content.map fun x => (splitProof x.text)).toArray
 
 /--
-A function that assumes the LLM will repeat the context before the proof.
+A response parser that assumes the LLM will repeat the context before the proof.
 -/
-def parseResponseQed_from_context (context : String) (res : OllamaResponse) : String :=
-  "aaa" ++ ((res.response.splitOn (sep := context))[1]?.getD "")
+def parseResponseQedOllamaMarkdown (context : String) (response : String) : String := Id.run do
+  -- Split the response by the context
+  let split_context := (response.splitOn context)
+  let post_context := split_context[1]?.getD ""
+  -- Remove the closing ``` and anything after it
+  let post_context := post_context.splitOn "```"
+  let post_context := post_context.headD ""
+  let post_context := post_context.trim
+  post_context
 
 def qedOllama (prompts : List String)
 (api : API) (options : GenerationOptionsQed) : IO $ Array (String × Float) := do
@@ -660,12 +667,12 @@ def qedOllama (prompts : List String)
         options := { temperature := temperature, stop := options.stop }
       }
       let res : OllamaResponse ← post req api.baseUrl api.key
-      results := results.insert ((parseResponseQedOllama res))
+      results := results.insert (parseResponseQedOllama res)
 
   let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
   return finalResults
 
-def qedOllamaKimina (prompts : List String) (context : String)
+def qedOllamaMarkdown (prompts : List String) (context : String)
 (api : API) (options : GenerationOptionsQed) : IO $ Array (String × Float) := do
   let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
   for prompt in prompts do
@@ -678,7 +685,7 @@ def qedOllamaKimina (prompts : List String) (context : String)
         options := { temperature := temperature, stop := options.stop }
       }
       let res : OllamaResponse ← post req api.baseUrl api.key
-      results := results.insert ((parseResponseQed_from_context context res))
+      results := results.insert ((parseResponseQedOllamaMarkdown context res.response))
 
   let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
   return finalResults
@@ -759,7 +766,7 @@ def LLMlean.Config.API.tacticGeneration
   let options ← getGenerationOptions api
   match api.responseFormat with
   | ResponseFormat.Markdown =>
-    tacticGenerationOllamaKimina «prefix» context prompts api options
+    tacticGenerationOllamaMarkdown «prefix» context prompts api options
   | ResponseFormat.Standard =>
     match api.kind with
     | APIKind.Ollama =>
@@ -777,7 +784,7 @@ def LLMlean.Config.API.proofCompletion
   let options ← getQedGenerationOptions api
   match api.responseFormat with
   | ResponseFormat.Markdown =>
-    qedOllamaKimina prompts context api options
+    qedOllamaMarkdown prompts context api options
   | ResponseFormat.Standard =>
     match api.kind with
     | APIKind.Ollama =>
