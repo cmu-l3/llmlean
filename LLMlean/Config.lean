@@ -36,6 +36,11 @@ register_option llmlean.numSamples : Nat := {
   descr := "If nonzero, number of samples to send to LLM API"
 }
 
+register_option llmlean.responseFormat : String := {
+  defValue := "",
+  descr := "If set, response format for the LLM (e.g. standard, markdown)"
+}
+
 def getConfigPath : IO (Option System.FilePath) := do
   let home ← IO.getEnv "HOME"
   let appData ← IO.getEnv "APPDATA"
@@ -125,6 +130,14 @@ def getNumSamples : CoreM (Option Nat) := do
     | some numSamples => return numSamples.toNat?
   | numSamples => return some numSamples
 
+def getResponseFormat : CoreM (Option String) := do
+  match llmlean.responseFormat.get (← getOptions) with
+  | "" =>
+    match ← IO.getEnv "LLMLEAN_RESPONSE_FORMAT" with
+    | none => getFromConfigFile `responseFormat
+    | some responseFormat => return some responseFormat
+  | responseFormat => return some responseFormat
+
 /-!
 ## Data Structures for configuration options
 -/
@@ -143,11 +156,17 @@ inductive PromptKind : Type
   | MarkdownReasoning
   deriving Inhabited, Repr
 
+inductive ResponseFormat : Type
+  | Standard     -- [TAC]...[/TAC] and [PROOF]...[/PROOF] format
+  | Markdown     -- ```lean4...``` format
+  deriving Inhabited, Repr
+
 structure API where
   model : String
   baseUrl : String
   kind : APIKind := .Ollama
   promptKind : PromptKind := .FewShot
+  responseFormat : ResponseFormat := .Standard
   key : String := ""
 deriving Inhabited, Repr
 

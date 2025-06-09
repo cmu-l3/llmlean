@@ -115,6 +115,11 @@ def getPromptKind (stringArg: String) : PromptKind :=
   | "markdown" => PromptKind.MarkdownReasoning
   | _ => PromptKind.Instruction
 
+def getResponseFormat (stringArg: String) : ResponseFormat :=
+  match stringArg with
+  | "markdown" => ResponseFormat.Markdown
+  | _ => ResponseFormat.Standard
+
 /-- Gets the API for the miniCTX model, without configuration. -/
 def getCTXOllamaAPI : CoreM API := do
   let url        := "http://localhost:11434/api/generate"
@@ -141,6 +146,7 @@ def getKiminaOllamaSmallBAPI : CoreM API := do
     baseUrl := url,
     kind := APIKind.Ollama,
     promptKind := getPromptKind promptKind,
+    responseFormat := ResponseFormat.Markdown,
     key := apiKey
   }
   return api
@@ -156,6 +162,7 @@ def getKiminaOllamaMediumAPI : CoreM API := do
     baseUrl := url,
     kind := APIKind.Ollama,
     promptKind := getPromptKind promptKind,
+    responseFormat := ResponseFormat.Markdown,
     key := apiKey
   }
   return api
@@ -166,11 +173,20 @@ def getConfiguredOllamaAPI : CoreM API := do
   let model      := (← Config.getModel).getD "wellecks/ntpctx-llama3-8b"
   let promptKind := (← Config.getPromptKind).getD "instruction"
   let apiKey     := (← Config.getApiKey).getD ""
+  -- Get response format from config, or auto-detect based on model
+  let responseFormatStr := (← Config.getResponseFormat).getD ""
+  let responseFormat := if responseFormatStr != "" then
+    getResponseFormat responseFormatStr
+  else if model.startsWith "BoltonBailey/Kimina-Prover-Preview" then
+    ResponseFormat.Markdown
+  else
+    ResponseFormat.Standard
   let api : API := {
     model := model,
     baseUrl := url,
     kind := APIKind.Ollama,
     promptKind := getPromptKind promptKind,
+    responseFormat := responseFormat,
     key := apiKey
   }
   return api
@@ -556,12 +572,16 @@ def getTacticFromBlockContext (context : String) (block : String) : String := Id
     return s!"Did not find context: \n\n{context}\n\n in \n\n{block}\n\n"
 
 def parseResponseOllamaKimina (_context : String) (res: OllamaResponse) : List String := Id.run do
+  -- Debug: log the raw response
+  dbg_trace s!"Kimina raw response: {res.response}"
   let blocks := getMarkdownLeanCodeBlocks res.response
+  dbg_trace s!"Found {blocks.length} code blocks"
   let mut results : List String := []
   for block in blocks do
     for line in (block.splitOn "\n") do
       if line.trim.length > 0 then
         results := results ++ [line.trim]
+  dbg_trace s!"Parsed tactics: {results}"
   return results
 
 def parseTacticResponseOpenAI (res: OpenAIResponse) (pfx : String) : Array String :=
@@ -787,10 +807,10 @@ def LLMlean.Config.API.tacticGeneration
   («prefix» : String) : CoreM $ Array (String × Float) := do
   let prompts := makePrompts api.promptKind context tacticState «prefix»
   let options ← getGenerationOptions api
-  -- TODO: avoid this hack
-  if "BoltonBailey/Kimina-Prover-Preview-Distill-1.5B" == api.model then
+  match api.responseFormat with
+  | ResponseFormat.Markdown =>
     tacticGenerationOllamaKimina «prefix» context prompts api options
-  else
+  | ResponseFormat.Standard =>
     match api.kind with
     | APIKind.Ollama =>
       tacticGenerationOllama «prefix» prompts api options
@@ -805,10 +825,10 @@ def LLMlean.Config.API.proofCompletion
   (api : API) (tacticState : String) (context : String) : CoreM $ Array (String × Float) := do
   let prompts := makeQedPrompts api.promptKind context tacticState
   let options ← getQedGenerationOptions api
-  -- TODO: avoid this hack
-  if "BoltonBailey/Kimina-Prover-Preview-Distill-1.5B" == api.model then
+  match api.responseFormat with
+  | ResponseFormat.Markdown =>
     qedOllamaKimina prompts context api options
-  else
+  | ResponseFormat.Standard =>
     match api.kind with
     | APIKind.Ollama =>
       qedOllama prompts api options
