@@ -112,7 +112,6 @@ deriving FromJson
 def getPromptKind (stringArg: String) : PromptKind :=
   match stringArg with
   | "fewshot" => PromptKind.FewShot
-  | "detailed" => PromptKind.Reasoning
   | "reasoning" => PromptKind.Reasoning
   | "markdown" => PromptKind.MarkdownReasoning
   | _ => PromptKind.Instruction
@@ -133,8 +132,6 @@ def getConfiguredOllamaAPI : CoreM API := do
   let responseFormatStr := (← Config.getResponseFormat).getD ""
   let responseFormat := if responseFormatStr != "" then
     getResponseFormat responseFormatStr
-  else if model.startsWith "BoltonBailey/Kimina-Prover-Preview" then
-    ResponseFormat.Markdown
   else
     ResponseFormat.Standard
   let api : API := {
@@ -351,7 +348,7 @@ Your task is to generate the next tactic in the proof.
 Generate this by writing a markdown file with the completed line, including the context of the file before it
 in a markdown code block.
 
-If you find it helpful, you can precede the proof with brief thoughts.
+If you find it helpful, you can precede the proof with brief thoughts. When you are done, end with </think>.
 
 "
   match pre with
@@ -716,7 +713,8 @@ def qedOllamaMarkdown (prompts : List String) (context : String)
         options := {
           temperature := temperature,
           stop := options.stop,
-          num_predict := options.maxTokens}
+          num_predict := options.maxTokens
+        }
       }
       let res : OllamaResponse ← post req api.baseUrl api.key
       match extractProofFromMarkdownResponse context res.response with
@@ -764,7 +762,7 @@ def qedAnthropic (prompts : List String)
           }
         ],
         temperature := temperature,
-        max_tokens := options.maxTokens.natAbs
+        max_tokens := options.maxTokens.toNat
       }
       let res : AnthropicResponse ← post req api.baseUrl api.key
       for result in (parseResponseQedAnthropic res) do
@@ -783,7 +781,7 @@ def getGenerationOptions (api : API) : CoreM GenerationOptions := do
   | some n => n
 
   let options : GenerationOptions := {
-    numSamples := numSamples,
+    numSamples := numSamples
   }
   return options
 
@@ -802,13 +800,13 @@ def LLMlean.Config.API.tacticGeneration
   («prefix» : String) : CoreM $ Array (String × Float) := do
   let prompts := makePrompts api.promptKind context tacticState «prefix»
   let options ← getGenerationOptions api
-  match api.responseFormat with
-  | ResponseFormat.Markdown =>
-    tacticGenerationOllamaMarkdown «prefix» context prompts api options
-  | ResponseFormat.Standard =>
-    match api.kind with
+  match api.kind with
     | APIKind.Ollama =>
-      tacticGenerationOllama «prefix» prompts api options
+      match api.responseFormat with
+      | ResponseFormat.Markdown =>
+          tacticGenerationOllamaMarkdown «prefix» context prompts api options
+      | _ =>
+          tacticGenerationOllama «prefix» prompts api options
     | APIKind.TogetherAI =>
       tacticGenerationOpenAI «prefix» prompts api options
     | APIKind.OpenAI =>
@@ -820,13 +818,13 @@ def LLMlean.Config.API.proofCompletion
   (api : API) (tacticState : String) (context : String) : CoreM $ Array (String × Float) := do
   let prompts := makeQedPrompts api.promptKind context tacticState
   let options ← getQedGenerationOptions api
-  match api.responseFormat with
-  | ResponseFormat.Markdown =>
-    qedOllamaMarkdown prompts context api options
-  | ResponseFormat.Standard =>
-    match api.kind with
+  match api.kind with
     | APIKind.Ollama =>
-      qedOllama prompts api options
+      match api.responseFormat with
+      | ResponseFormat.Markdown =>
+        qedOllamaMarkdown prompts context api options
+      | _ =>
+        qedOllama prompts api options
     | APIKind.TogetherAI =>
       qedOpenAI prompts api options
     | APIKind.OpenAI =>
