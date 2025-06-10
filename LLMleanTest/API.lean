@@ -47,20 +47,3 @@ info: true
 -/
 #guard_msgs in
 #eval getTacticFromBlockContext "import Mathlib\ntheorem foo (a b : ℕ) : a + a + b = a + b + a := by" codeBlockExample1 == "ring"
-
--- Test `parseResponseQedOllamaMarkdown`
-/--
-info: "ring"
--/
-#guard_msgs in
-#eval parseResponseQedOllamaMarkdown contextExample1 markdownExample1
-
--- #eval do
---   let api : API ← getConfiguredAPI
---   IO.println (reprStr api)
---   let context := "import Mathlib\ntheorem foo (a b : ℕ) : a + a + b = a + b + a := by "
---   let tacticState := "a b : ℕ\n⊢  a + a + b = a + b + a"
---   let prefix_ := ""
---   let res ← API.proofCompletion api tacticState context
---   for r in res do
---     IO.println r

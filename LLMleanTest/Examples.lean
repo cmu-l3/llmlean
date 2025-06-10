@@ -2,12 +2,10 @@ import Mathlib
 import LLMlean
 
 example {α : Type _} (r s t : Set α) : r ⊆ s → s ⊆ t → r ⊆ t := by
-  intro h1 h2
-  exact h1.trans h2
+  sorry
 
 example (x y : ℕ) : x + y = y + x := by
-  rw [Nat.add_comm]
-
+  sorry
 
 variable {Ω : Type*}[Fintype Ω]
 
