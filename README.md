@@ -2,6 +2,10 @@
 
 LLMlean integrates LLMs and Lean for tactic suggestions, proof completion, and more.
 
+## News
+
+- **06/2025**: Added support for [Kimina Prover](https://arxiv.org/abs/2504.11354) models via Ollama
+
 Here's an example of using LLMLean on problems from [Mathematics in Lean](https://github.com/leanprover-community/mathematics_in_lean):
 
 https://github.com/user-attachments/assets/284a8b32-b7a5-4606-8240-effe086f2b82
@@ -23,21 +27,16 @@ apiKey = "<your-openai-api-key>"
 ```
 
 (Alternatively, you may set the API key using the environment variable `LLMLEAN_API_KEY` or using `set_option llmlean.apiKey "<your-api-key>"`.)
-Similarly, to set up an Anthropic LLM, use
 
-```toml
-api = "anthropic"
-model = "claude-3-7-sonnet-20250219"
-apiKey = "<your-anthropic-api-key>"
-```
+You can also use other providers such as Anthropic, Together.AI, or any provider adhering to the OpenAI API. See [other providers](docs/other_providers.md).
 
-1. Add `llmlean` to lakefile:
+3. Add `llmlean` to lakefile:
 ```lean
 require llmlean from git
   "https://github.com/cmu-l3/llmlean.git"
 ```
 
-1. Import:
+4. Import:
 ```lean
 import LLMlean
 ```
@@ -60,20 +59,7 @@ model = "wellecks/ntpctx-llama3-8b" # model name from above
 
 Then do steps (3) and (4) above. Now use a tactic described below.
 
-
-
-#### Option 3: LLM in the cloud (together.ai):
-
-1. Get a [together.ai](https://www.together.ai/) API key.
-
-2. Set 2 configuration variables in `~/.config/llmlean/config.toml`:
-
-```toml
-api = "together"
-apiKey = "<your-together-api-key>"
-```
-
-Then do steps (3) and (4) above. Now use a tactic described below.
+Note that there are multiple Lean models available for download from Ollama, including [Kimina Prover](https://arxiv.org/abs/2504.11354) models which use chain-of-thought reasoning. You can find a list of these models and how to configure them in the [Ollama Models](docs/ollama-models.md) document.
 
 
 ## Tactics

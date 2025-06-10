@@ -23,7 +23,7 @@ register_option llmlean.model : String := {
 
 register_option llmlean.prompt : String := {
   defValue := "",
-  descr := "If set, prompt type for the LLM (e.g. fewshot, detailed, instruction)"
+  descr := "If set, prompt kind for the LLM (e.g. fewshot, reasoning, instruction)"
 }
 
 register_option llmlean.apiKey : String := {
@@ -34,6 +34,11 @@ register_option llmlean.apiKey : String := {
 register_option llmlean.numSamples : Nat := {
   defValue := 0,
   descr := "If nonzero, number of samples to send to LLM API"
+}
+
+register_option llmlean.responseFormat : String := {
+  defValue := "",
+  descr := "If set, response format for the LLM (e.g. standard, markdown)"
 }
 
 def getConfigPath : IO (Option System.FilePath) := do
@@ -61,16 +66,23 @@ def getConfigTable : IO (Option Lake.Toml.Table) := do
     return none
 
 open Lake Toml
+
+/-- Access a value from the `config.toml` file, or print errors. -/
 def getFromConfigFile (key : Name) : IO (Option String) := do
   let table ← getConfigTable
   let table := table.get!
-  let (value, errors) := Id.run do StateT.run (s := #[]) do
-    let value : Option String ← table.tryDecode? key
+  let result := EStateM.run (s := #[]) do
+    let value : Option String ← table.decode? key
     return value
-  for e in errors do IO.eprintln e.msg
-  return value
+  match result with
+  | .ok value errors => do
+    for e in errors do IO.eprintln e.msg
+    return value
+  | .error () errors => do
+    for e in errors do IO.eprintln e.msg
+    return none
 
-def getApi : CoreM (Option String) := do
+def getApiKind : CoreM (Option String) := do
   match llmlean.api.get (← getOptions) with
   | "" =>
     match ← IO.getEnv "LLMLEAN_API" with
@@ -94,7 +106,7 @@ def getModel : CoreM (Option String) := do
     | some model => return some model
   | model => return some model
 
-def getPrompt : CoreM (Option String) := do
+def getPromptKind : CoreM (Option String) := do
   match llmlean.prompt.get (← getOptions) with
   | "" =>
     match ← IO.getEnv "LLMLEAN_PROMPT" with
@@ -117,5 +129,45 @@ def getNumSamples : CoreM (Option Nat) := do
     | none => Option.map String.toNat! <$> getFromConfigFile `numSamples
     | some numSamples => return numSamples.toNat?
   | numSamples => return some numSamples
+
+def getResponseFormat : CoreM (Option String) := do
+  match llmlean.responseFormat.get (← getOptions) with
+  | "" =>
+    match ← IO.getEnv "LLMLEAN_RESPONSE_FORMAT" with
+    | none => getFromConfigFile `responseFormat
+    | some responseFormat => return some responseFormat
+  | responseFormat => return some responseFormat
+
+/-!
+## Data Structures for configuration options
+-/
+
+inductive APIKind : Type
+  | Ollama
+  | TogetherAI
+  | OpenAI
+  | Anthropic
+  deriving Inhabited, Repr
+
+inductive PromptKind : Type
+  | FewShot
+  | Instruction
+  | Reasoning
+  | MarkdownReasoning
+  deriving Inhabited, Repr
+
+inductive ResponseFormat : Type
+  | Standard     -- [TAC]...[/TAC] and [PROOF]...[/PROOF] format
+  | Markdown     -- ```lean4...``` format
+  deriving Inhabited, Repr
+
+structure API where
+  model : String
+  baseUrl : String
+  kind : APIKind := .Ollama
+  promptKind : PromptKind := .FewShot
+  responseFormat : ResponseFormat := .Standard
+  key : String := ""
+deriving Inhabited, Repr
 
 end LLMlean.Config

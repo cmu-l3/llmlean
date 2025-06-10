@@ -1,0 +1,15 @@
+name = "LLMlean"
+keywords = ["llm"]
+defaultTargets = ["LLMlean"]
+
+[[require]]
+name = "PFR"
+git = "https://github.com/teorth/pfr"
+rev = "v4.19.0"
+
+[[lean_lib]]
+name = "LLMlean"
+
+[[lean_lib]]
+name = "LLMleanTest"
+globs = ["LLMleanTest.API"]

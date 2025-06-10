@@ -2,52 +2,30 @@
 import Lean
 import LLMlean.Config
 
-open Lean
+open Lean LLMlean.Config
 
 namespace LLMlean
 
-
-inductive APIKind : Type
-  | Ollama
-  | TogetherAI
-  | OpenAI
-  | Anthropic
-  deriving Inhabited, Repr
-
-
-inductive PromptKind : Type
-  | FewShot
-  | Instruction
-  | Detailed
-  deriving Inhabited, Repr
-
-
-structure API where
-  model : String
-  baseUrl : String
-  kind : APIKind := APIKind.Ollama
-  promptKind := PromptKind.FewShot
-  key : String := ""
-deriving Inhabited, Repr
-
-
 structure GenerationOptionsOllama where
+  /-- Temperature represents the level of randomness/creativity in the model output, higher being more random. -/
   temperature : Float := 0.7
-  «stop» : List String := ["[/TAC]"]
+  «stop» : List String := ["[/TAC]", "[/PROOF]", "</think>"]
   /-- Maximum number of tokens to generate. `-1` means no limit. -/
-  num_predict : Int := 100
+  num_predict : Int := 512
 deriving ToJson
 
 structure GenerationOptions where
   temperature : Float := 0.7
   numSamples : Nat := 10
-  «stop» : List String := ["\n", "[/TAC]"]
+  «stop» : List String := ["[/TAC]"]
+  maxTokens : Int := 1024
 deriving ToJson
 
 structure GenerationOptionsQed where
   temperature : Float := 0.7
   numSamples : Nat := 10
-  «stop» : List String := ["\n\n"]
+  «stop» : List String := ["[/PROOF]", "</think>"]
+  maxTokens : Int := 1024
 deriving ToJson
 
 structure OllamaTacticGenerationRequest where
@@ -80,17 +58,17 @@ structure OpenAIQedRequest where
   messages : List OpenAIMessage
   n : Nat := 5
   temperature : Float := 0.7
-  max_tokens : Nat := 512
+  max_tokens : Int := 1024
   stream : Bool := false
-  «stop» : List String := ["\n\n", "[/PROOF]"]
+  «stop» : List String := ["[/PROOF]"]
 deriving ToJson
 
 structure OpenAITacticGenerationRequest where
   model : String
   messages : List OpenAIMessage
-  n : Nat := 5
+  n : Nat := 4
   temperature : Float := 0.7
-  max_tokens : Nat := 100
+  max_tokens : Int := 512
   stream : Bool := false
   «stop» : List String := ["[/TAC]"]
 deriving ToJson
@@ -99,7 +77,7 @@ structure AnthropicQedRequest where
   model : String
   messages : List OpenAIMessage
   temperature : Float := 0.7
-  max_tokens : Nat := 512
+  max_tokens : Nat := 1024
   stream : Bool := false
   stop_sequences : List String := ["[/PROOF]"]
 deriving ToJson
@@ -108,7 +86,7 @@ structure AnthropicTacticGenerationRequest where
   model : String
   messages : List OpenAIMessage
   temperature : Float := 0.7
-  max_tokens : Nat := 100
+  max_tokens : Nat := 512
   stream : Bool := false
   stop_sequences : List String := ["[/TAC]"]
 deriving ToJson
@@ -134,27 +112,43 @@ deriving FromJson
 def getPromptKind (stringArg: String) : PromptKind :=
   match stringArg with
   | "fewshot" => PromptKind.FewShot
-  | "detailed" => PromptKind.Detailed
+  | "reasoning" => PromptKind.Reasoning
+  | "markdown" => PromptKind.MarkdownReasoning
   | _ => PromptKind.Instruction
 
-def getOllamaAPI : CoreM API := do
+def getResponseFormat (stringArg: String) : ResponseFormat :=
+  match stringArg with
+  | "markdown" => ResponseFormat.Markdown
+  | _ => ResponseFormat.Standard
+
+
+/-- Gets an Ollama API, with details coming either from environment variables or the contents of the `config.toml` file. -/
+def getConfiguredOllamaAPI : CoreM API := do
   let url        := (← Config.getEndpoint).getD "http://localhost:11434/api/generate"
   let model      := (← Config.getModel).getD "wellecks/ntpctx-llama3-8b"
-  let promptKind := (← Config.getPrompt).getD "instruction"
+  let promptKind := (← Config.getPromptKind).getD "instruction"
   let apiKey     := (← Config.getApiKey).getD ""
+  -- Get response format from config, or auto-detect based on model
+  let responseFormatStr := (← Config.getResponseFormat).getD ""
+  let responseFormat := if responseFormatStr != "" then
+    getResponseFormat responseFormatStr
+  else
+    ResponseFormat.Standard
   let api : API := {
     model := model,
     baseUrl := url,
     kind := APIKind.Ollama,
     promptKind := getPromptKind promptKind,
+    responseFormat := responseFormat,
     key := apiKey
   }
   return api
 
-def getTogetherAPI : CoreM API := do
+/-- Gets a TogetherAI API, with details coming either from environment variables or the contents of the `config.toml` file. -/
+def getConfiguredTogetherAPI : CoreM API := do
   let url        := (← Config.getEndpoint).getD "https://api.together.xyz/v1/chat/completions"
   let model      := (← Config.getModel).getD "Qwen/Qwen2.5-72B-Instruct-Turbo"
-  let promptKind := (← Config.getPrompt).getD "detailed"
+  let promptKind := (← Config.getPromptKind).getD "reasoning"
   let apiKey     := (← Config.getApiKey).getD ""
   let api : API := {
     model := model,
@@ -165,10 +159,11 @@ def getTogetherAPI : CoreM API := do
   }
   return api
 
-def getOpenAIAPI : CoreM API := do
+/-- Gets an OpenAI API, with details coming either from environment variables or the contents of the `config.toml` file. -/
+def getConfiguredOpenAIAPI : CoreM API := do
   let url        := (← Config.getEndpoint).getD "https://api.openai.com/v1/chat/completions"
   let model      := (← Config.getModel).getD "gpt-4o"
-  let promptKind := (← Config.getPrompt).getD "detailed"
+  let promptKind := (← Config.getPromptKind).getD "reasoning"
   let apiKey     := (← Config.getApiKey).getD ""
   let api : API := {
     model := model,
@@ -179,10 +174,11 @@ def getOpenAIAPI : CoreM API := do
   }
   return api
 
-def getAnthropicAPI : CoreM API := do
+/-- Gets an Anthropic API, with details coming either from environment variables or the contents of the `config.toml` file. -/
+def getConfiguredAnthropicAPI : CoreM API := do
   let url        := (← Config.getEndpoint).getD "https://api.anthropic.com/v1/messages"
   let model      := (← Config.getModel).getD "claude-3-7-sonnet-20250219"
-  let promptKind := (← Config.getPrompt).getD "detailed"
+  let promptKind := (← Config.getPromptKind).getD "reasoning"
   let apiKey     := (← Config.getApiKey).getD ""
   let api : API := {
     model := model,
@@ -193,13 +189,15 @@ def getAnthropicAPI : CoreM API := do
   }
   return api
 
-def getAPI : CoreM API := do
-  let apiKind  := (← Config.getApi).getD "openai"
+/-- Gets the configured API, with details coming either from environment variables or the contents of the `config.toml` file. -/
+def getConfiguredAPI : CoreM API := do
+  let apiKind := (← Config.getApiKind).getD "ollama"
   match apiKind with
-  | "ollama" => getOllamaAPI
-  | "together" => getTogetherAPI
-  | "anthropic" => getAnthropicAPI
-  | _ => getOpenAIAPI
+  | "ollama" => getConfiguredOllamaAPI
+  | "together" => getConfiguredTogetherAPI
+  | "anthropic" => getConfiguredAnthropicAPI
+  | "openai" => getConfiguredOpenAIAPI
+  | _ => getConfiguredOllamaAPI -- TODO: This should throw an error of some kind.
 
 def post {α β : Type} [ToJson α] [FromJson β] (req : α) (url : String) (apiKey : String): IO β := do
   let out ← IO.Process.output {
@@ -221,8 +219,11 @@ def post {α β : Type} [ToJson α] [FromJson β] (req : α) (url : String) (api
     | throw $ IO.userError out.stdout
   return res
 
+/--
+See `makePrompts`.
+-/
 def makePromptsFewShot (context : String) (state : String) (pre: String) : List String :=
-  let p1 := "Given the Lean 4 tactic state, suggest a next tactic.
+  let p1 := s!"Given the Lean 4 tactic state, suggest a next tactic.
 Here are some examples:
 
 Tactic state:
@@ -264,19 +265,22 @@ rw [← h.gcd_eq_one]
 
 Tactic state:
 ---
-" ++ state ++ "
+{state}
 ---
 Next tactic:
 ---
-" ++ pre
+{pre}"
   let p2 := match pre with
   | "" => context
   | _  => p1
 
   [p1, p2]
 
+/--
+See `makePrompts`.
+-/
 def makePromptsInstruct (context : String) (state : String) (pre: String) : List String :=
-  let p1 := "/- You are proving a theorem in Lean 4.
+  let p1 := s!"/- You are proving a theorem in Lean 4.
 You are given the following information:
 - The file contents up to the current tactic, inside [CTX]...[/CTX]
 - The current proof state, inside [STATE]...[/STATE]
@@ -285,24 +289,85 @@ Your task is to generate the next tactic in the proof.
 Put the next tactic inside [TAC]...[/TAC].
 -/
 [CTX]
-" ++ context ++ "
+{context}
 [/CTX]
 [STATE]
-" ++ state ++ "
+{state}
 [/STATE]
 [TAC]
-" ++ pre
+{pre}"
   [p1]
 
-def makePromptsDetailed (context : String) (state : String) (pre: String) : List String :=
-  makePromptsInstruct context state pre
+/--
+See `makePrompts`.
+-/
+def makePromptsReasoning (context : String) (state : String) (pre: String) : List String :=
+  let p1 := s!"/- You are proving a theorem in Lean 4.
+You are given the following information:
+- The file contents up to the current tactic, inside [CTX]...[/CTX]
+- The current proof state, inside [STATE]...[/STATE]
 
+Your task is to generate the next tactic in the proof.
+Put the next tactic inside [TAC]...[/TAC].
+If you find it helpful, you can precede the proof with brief thoughts inside [THOUGHTS]...[/THOUGHTS]
+In summary, your output should be of the form:
+[THOUGHTS]
+...
+[/THOUGHTS]
+[TAC]
+...
+[/TAC]
+
+[CTX]
+{context}
+[/CTX]
+[STATE]
+{state}
+[/STATE]
+[THOUGHTS]
+{pre}"
+  [p1]
+
+/--
+See `makePrompts`.
+-/
+def makePromptsMarkdownReasoning (context : String) (state : String) (pre: String) : List String :=
+  let p1 := s!"You are proving a theorem in Lean 4.
+You are given the following information:
+
+The file contents up to the current tactic are as follows:
+
+```lean4
+{context}
+```
+
+The current proof state is as follows:
+{state}
+
+Your task is to generate the next tactic in the proof.
+Generate this by writing a markdown file with the completed line, including the context of the file before it
+in a markdown code block.
+
+If you find it helpful, you can precede the proof with brief thoughts. When you are done, end with </think>.
+
+"
+  match pre with
+  | "" => [p1]
+  | pre => [p1 ++ s!"The tactic you generate should start with {pre}"]
+
+/--
+See `makeQedPrompts`.
+TODO implement
+-/
 def makeQedPromptsFewShot (context : String) (_state : String) : List String :=
   let p1 := context
   [p1]
 
+/--
+See `makeQedPrompts`.
+-/
 def makeQedPromptsInstruct (context : String) (_state : String) : List String :=
-  let p1 := "/- You are proving a theorem in Lean 4.
+  let p1 := s!"/- You are proving a theorem in Lean 4.
 You are given the following information:
 - The current file contents up to and including the theorem statement, inside [CTX]...[/CTX]
 
@@ -310,13 +375,16 @@ Your task is to generate the proof.
 Put the proof inside [PROOF]...[/PROOF]
 -/
 [CTX]
-" ++ context ++ "
+{context}
 [/CTX]
 [PROOF]"
   [p1]
 
-def makeQedPromptsDetailed (context : String) (state : String) : List String :=
-  let p1 := "/- You are proving a theorem in Lean 4.
+/--
+See `makeQedPrompts`.
+-/
+def makeQedPromptsReasoning (context : String) (state : String) : List String :=
+  let p1 := s!"/- You are proving a theorem in Lean 4.
 You are given the following information:
 - The file contents up to the current tactic, inside [CTX]...[/CTX]
 - The current proof state, inside [STATE]...[/STATE]
@@ -337,33 +405,78 @@ Therefore, make sure the proof is formatted as one tactic per line,
 with no additional comments or text.
 -/
 [CTX]
-" ++ context ++ "
+{context}
 [/CTX]
 [STATE]
-" ++ state ++ "
+{state}
 [/STATE]
 "
   [p1]
 
+/--
+See `makeQedPrompts`.
+-/
+def makeQedPromptsMarkdownReasoning (context : String) (state : String) : List String :=
+  let p1 := s!"You are proving a theorem in Lean 4.
 
+You are given the following information:
+The file contents up to the current tactic are as follows:
+```lean4
+{context}
+```
+The current proof state is as follows:
+{state}
+Your task is to generate the proof.
+Generate this by writing a markdown file with the completed proof, including the context of the file before it
+in a markdown code block.
+
+IMPORTANT: you must end by writing your full proof in the format:
+```lean4
+<... your proof here...>
+```
+
+If you find it helpful, you can precede the proof with brief thoughts, outside the tactic blocks.
+IMPORTANT: Once you have written a complete proof, end with </think>.
+"
+  [p1]
+
+/--
+Makes prompts for single tactic generation,
+given a `context` containing the file contents up to the tactic invocation,
+and a `state` containing the current proof state,
+and a `pre` string containing the prefix of the tactic to be generated.
+-/
 def makePrompts (promptKind : PromptKind) (context : String) (state : String) (pre: String) : List String :=
   match promptKind with
   | PromptKind.FewShot => makePromptsFewShot context state pre
-  | PromptKind.Detailed => makePromptsDetailed context state pre
-  | _ => makePromptsInstruct context state pre
+  | PromptKind.Reasoning => makePromptsReasoning context state pre
+  | PromptKind.Instruction => makePromptsInstruct context state pre
+  | PromptKind.MarkdownReasoning => makePromptsMarkdownReasoning context state pre
 
 
+/--
+Makes prompts for the complete proof generation,
+given a `context` containing the file contents up to the tactic invocation,
+and a `state` containing the current proof state.
+-/
 def makeQedPrompts (promptKind : PromptKind) (context : String) (state : String) : List String :=
   match promptKind with
   | PromptKind.FewShot => makeQedPromptsFewShot context state
-  | PromptKind.Detailed => makeQedPromptsDetailed context state
-  | _ => makeQedPromptsInstruct context state
+  | PromptKind.Reasoning => makeQedPromptsReasoning context state
+  | PromptKind.Instruction => makeQedPromptsInstruct context state
+  | PromptKind.MarkdownReasoning => makeQedPromptsMarkdownReasoning context state
 
-
+/--
+Returns true if the string `s` contains any of the banned tactics, such as `sorry` and `admit`.
+-/
 def filterGeneration (s: String) : Bool :=
   let banned := ["sorry", "admit", "▅"]
   !(banned.any fun s' => (s.splitOn s').length > 1)
 
+/--
+Parses a tactic out of a response from the LLM.
+The tactic is expected to be enclosed in `[TAC]...[/TAC]` tags.
+-/
 def splitTac (text : String) : String :=
   let text := ((text.splitOn "[TAC]").tailD [text]).headD text
   match (text.splitOn "[/TAC]").head? with
@@ -373,15 +486,63 @@ def splitTac (text : String) : String :=
 def parseResponseOllama (res: OllamaResponse) : String :=
   splitTac res.response
 
+/--
+Parses a string consisting of Markdown text, and extracts the Lean code blocks.
+The code blocks are enclosed in triple backticks.
+The opening triple backticks may be followed by a language identifier "lean", "lean4", or "tactics".
+The closing triple backticks should be followed by a newline.
+-/
+def getMarkdownLeanCodeBlocks (markdown : String) : List String := Id.run do
+  -- Replace all instances of "lean" with "lean4"
+  let markdown := markdown.replace "```lean\n" "```lean4\n"
+  -- Replace all instances of "tactics" with "lean4"
+  let markdown := markdown.replace "```tactics\n" "```lean4\n"
+  -- Split the markdown by opening triple backticks
+  let parts := (markdown.splitOn "```lean4\n").tailD []
+  let mut blocks : List String := []
+  -- From each part, delete the closing triple backticks and after
+  for part in parts do
+    let part := part.splitOn "```"
+    if part.length > 0 then
+      blocks := blocks ++ [part.headD ""]
+  return blocks
+
+/--
+Given a code block and a context, returns the first line of the code block after the context is written out.
+-/
+def getTacticFromBlockContext (context : String) (block : String) : String := Id.run do
+  -- Get the trimmed last nonempty nonwhitespace line of the context
+  let last_context := (((context.splitOn "\n").filter (fun x => x.trim.length > 0)).getLast?.getD "").trim
+
+  -- Trim every line of the block
+  let block := "\n".intercalate ((block.splitOn "\n").map (fun x => x.trim))
+
+  let post_context := (block.splitOn last_context)[1]?.getD ""
+  if post_context.length > 0 then
+    -- get the first nonempty nonwhitespace line of the post_context
+    let tactic := ((post_context.splitOn "\n").filter (fun x => x.trim.length > 0)).getLast?.getD ""
+    return tactic.trim
+  else
+    return s!"Did not find context: \n\n{context}\n\n in \n\n{block}\n\n"
+
+def parseTacticResponseOllamaMarkdown (_context : String) (res: OllamaResponse) : List String := Id.run do
+  let blocks := getMarkdownLeanCodeBlocks res.response
+  let mut results : List String := []
+  for block in blocks do
+    for line in (block.splitOn "\n") do
+      if line.trim.length > 0 then
+        results := results ++ [line.trim]
+  return results
+
 def parseTacticResponseOpenAI (res: OpenAIResponse) (pfx : String) : Array String :=
   (res.choices.map fun x => pfx ++ (splitTac x.message.content)).toArray
 
 def parseTacticResponseAnthropic (res: AnthropicResponse) (pfx : String) : Array String :=
   (res.content.map fun x => pfx ++ (splitTac x.text)).toArray
 
-def tacticGenerationOllama (pfx : String) (prompts : List String)
+def tacticGenerationOllamaMarkdown (_pfx : String) (context : String) (prompts : List String)
 (api : API) (options : GenerationOptions) : IO $ Array (String × Float) := do
-  let mut results : Std.HashSet String := Std.HashSet.empty
+  let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
   for prompt in prompts do
     for i in List.range options.numSamples do
       let temperature := if i == 1 then 0.0 else options.temperature
@@ -389,7 +550,32 @@ def tacticGenerationOllama (pfx : String) (prompts : List String)
         model := api.model,
         prompt := prompt,
         stream := false,
-        options := { temperature := temperature }
+        options := {
+          temperature := temperature,
+          num_predict := options.maxTokens
+        }
+      }
+      let res : OllamaResponse ← post req api.baseUrl api.key
+      for tactic in (parseTacticResponseOllamaMarkdown context res) do
+        results := results.insert (tactic)
+
+  let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
+  return finalResults
+
+def tacticGenerationOllama (pfx : String) (prompts : List String)
+(api : API) (options : GenerationOptions) : IO $ Array (String × Float) := do
+  let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
+  for prompt in prompts do
+    for i in List.range options.numSamples do
+      let temperature := if i == 1 then 0.0 else options.temperature
+      let req : OllamaTacticGenerationRequest := {
+        model := api.model,
+        prompt := prompt,
+        stream := false,
+        options := {
+          temperature := temperature,
+          num_predict := options.maxTokens
+        }
       }
       let res : OllamaResponse ← post req api.baseUrl api.key
       results := results.insert (pfx ++ (parseResponseOllama res))
@@ -399,7 +585,7 @@ def tacticGenerationOllama (pfx : String) (prompts : List String)
 
 def tacticGenerationOpenAI (pfx : String) (prompts : List String)
 (api : API) (options : GenerationOptions) : IO $ Array (String × Float) := do
-  let mut results : Std.HashSet String := Std.HashSet.empty
+  let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
   for prompt in prompts do
     let req : OpenAITacticGenerationRequest := {
       model := api.model,
@@ -410,7 +596,8 @@ def tacticGenerationOpenAI (pfx : String) (prompts : List String)
         }
       ],
       n := options.numSamples,
-      temperature := options.temperature
+      temperature := options.temperature,
+      max_tokens := options.maxTokens
     }
     let res : OpenAIResponse ← post req api.baseUrl api.key
     for result in (parseTacticResponseOpenAI res pfx) do
@@ -421,7 +608,7 @@ def tacticGenerationOpenAI (pfx : String) (prompts : List String)
 
 def tacticGenerationAnthropic (pfx : String) (prompts : List String)
 (api : API) (options : GenerationOptions) : IO $ Array (String × Float) := do
-  let mut results : Std.HashSet String := Std.HashSet.empty
+  let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
   for prompt in prompts do
     for i in List.range options.numSamples do
       let temperature := if i == 1 then 0.0 else options.temperature
@@ -433,7 +620,8 @@ def tacticGenerationAnthropic (pfx : String) (prompts : List String)
             content := prompt
           }
         ],
-        temperature := temperature
+        temperature := temperature,
+        max_tokens := options.maxTokens.natAbs
       }
       let res : AnthropicResponse ← post req api.baseUrl api.key
       for result in (parseTacticResponseAnthropic res pfx) do
@@ -442,6 +630,10 @@ def tacticGenerationAnthropic (pfx : String) (prompts : List String)
   let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
   return finalResults
 
+/--
+Parses a proof out of a response from the LLM.
+The proof is expected to be enclosed in `[PROOF]...[/PROOF]` tags.
+-/
 def splitProof (text : String) : String :=
   let text := ((text.splitOn "[PROOF]").tailD [text]).headD text
   match (text.splitOn "[/PROOF]").head? with
@@ -457,9 +649,38 @@ def parseResponseQedOpenAI (res: OpenAIResponse) : Array String :=
 def parseResponseQedAnthropic (res: AnthropicResponse) : Array String :=
   (res.content.map fun x => (splitProof x.text)).toArray
 
+/--
+Extracts proof from markdown response by finding the last code block
+and extracting content after the context.
+-/
+def extractProofFromMarkdownResponse (context : String) (response : String) : Option String := do
+  let blocks := getMarkdownLeanCodeBlocks response
+  let lastBlock ← blocks.getLast?
+
+  -- Try to find where the context ends in the block
+  -- First try: split by the entire context
+  let splitByFullContext := lastBlock.splitOn context
+  if splitByFullContext.length > 1 then
+    -- Found the full context, return everything after it
+    let proof := splitByFullContext[1]!.trim
+    return proof
+
+  -- Second try: find the last non-empty line of context and split by that
+  let contextLines := context.splitOn "\n"
+  let lastContextLine := (contextLines.filter (fun x => x.trim.length > 0)).getLast?.getD ""
+  if lastContextLine.length > 0 then
+    let splitByLastLine := lastBlock.splitOn lastContextLine
+    if splitByLastLine.length > 1 then
+      -- Found the last context line, return everything after it
+      let proof := splitByLastLine[1]!.trim
+      return proof
+
+  -- If we can't find the context, return the whole block
+  some lastBlock.trim
+
 def qedOllama (prompts : List String)
 (api : API) (options : GenerationOptionsQed) : IO $ Array (String × Float) := do
-  let mut results : Std.HashSet String := Std.HashSet.empty
+  let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
   for prompt in prompts do
     for i in List.range options.numSamples do
       let temperature := if i == 1 then 0.0 else options.temperature
@@ -467,17 +688,45 @@ def qedOllama (prompts : List String)
         model := api.model,
         prompt := prompt,
         stream := false,
-        options := { temperature := temperature, stop := options.stop }
+        options := {
+          temperature := temperature,
+          stop := options.stop,
+          num_predict := options.maxTokens
+        }
       }
       let res : OllamaResponse ← post req api.baseUrl api.key
-      results := results.insert ((parseResponseQedOllama res))
+      results := results.insert (parseResponseQedOllama res)
+
+  let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
+  return finalResults
+
+def qedOllamaMarkdown (prompts : List String) (context : String)
+(api : API) (options : GenerationOptionsQed) : IO $ Array (String × Float) := do
+  let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
+  for prompt in prompts do
+    for i in List.range options.numSamples do
+      let temperature := if i == 1 then 0.0 else options.temperature
+      let req : OllamaQedRequest := {
+        model := api.model,
+        prompt := prompt,
+        stream := false,
+        options := {
+          temperature := temperature,
+          stop := options.stop,
+          num_predict := options.maxTokens
+        }
+      }
+      let res : OllamaResponse ← post req api.baseUrl api.key
+      match extractProofFromMarkdownResponse context res.response with
+      | some proof => results := results.insert proof
+      | none => results := results
 
   let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
   return finalResults
 
 def qedOpenAI (prompts : List String)
 (api : API) (options : GenerationOptionsQed) : IO $ Array (String × Float) := do
-  let mut results : Std.HashSet String := Std.HashSet.empty
+  let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
   for prompt in prompts do
     let req : OpenAIQedRequest := {
       model := api.model,
@@ -488,7 +737,8 @@ def qedOpenAI (prompts : List String)
         }
       ],
       n := options.numSamples,
-      temperature := options.temperature
+      temperature := options.temperature,
+      max_tokens := options.maxTokens
     }
     let res : OpenAIResponse ← post req api.baseUrl api.key
     for result in (parseResponseQedOpenAI res) do
@@ -499,7 +749,7 @@ def qedOpenAI (prompts : List String)
 
 def qedAnthropic (prompts : List String)
 (api : API) (options : GenerationOptionsQed) : IO $ Array (String × Float) := do
-  let mut results : Std.HashSet String := Std.HashSet.empty
+  let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
   for prompt in prompts do
     for i in List.range options.numSamples do
       let temperature := if i == 1 then 0.0 else options.temperature
@@ -511,7 +761,8 @@ def qedAnthropic (prompts : List String)
             content := prompt
           }
         ],
-        temperature := temperature
+        temperature := temperature,
+        max_tokens := options.maxTokens.toNat
       }
       let res : AnthropicResponse ← post req api.baseUrl api.key
       for result in (parseResponseQedAnthropic res) do
@@ -541,33 +792,44 @@ def getQedGenerationOptions (api : API): CoreM GenerationOptionsQed := do
   }
   return options
 
-def API.tacticGeneration
+/--
+Generates a list of tactics using the LLM API.
+-/
+def LLMlean.Config.API.tacticGeneration
   (api : API) (tacticState : String) (context : String)
   («prefix» : String) : CoreM $ Array (String × Float) := do
   let prompts := makePrompts api.promptKind context tacticState «prefix»
   let options ← getGenerationOptions api
   match api.kind with
-  | APIKind.Ollama =>
-    tacticGenerationOllama «prefix» prompts api options
-  | APIKind.TogetherAI =>
-    tacticGenerationOpenAI «prefix» prompts api options
-  | APIKind.OpenAI =>
-    tacticGenerationOpenAI «prefix» prompts api options
-  | APIKind.Anthropic =>
-    tacticGenerationAnthropic «prefix» prompts api options
+    | APIKind.Ollama =>
+      match api.responseFormat with
+      | ResponseFormat.Markdown =>
+          tacticGenerationOllamaMarkdown «prefix» context prompts api options
+      | _ =>
+          tacticGenerationOllama «prefix» prompts api options
+    | APIKind.TogetherAI =>
+      tacticGenerationOpenAI «prefix» prompts api options
+    | APIKind.OpenAI =>
+      tacticGenerationOpenAI «prefix» prompts api options
+    | APIKind.Anthropic =>
+      tacticGenerationAnthropic «prefix» prompts api options
 
-def API.proofCompletion
+def LLMlean.Config.API.proofCompletion
   (api : API) (tacticState : String) (context : String) : CoreM $ Array (String × Float) := do
   let prompts := makeQedPrompts api.promptKind context tacticState
   let options ← getQedGenerationOptions api
   match api.kind with
-  | APIKind.Ollama =>
-    qedOllama prompts api options
-  | APIKind.TogetherAI =>
-    qedOpenAI prompts api options
-  | APIKind.OpenAI =>
-    qedOpenAI prompts api options
-  | APIKind.Anthropic =>
-    qedAnthropic prompts api options
+    | APIKind.Ollama =>
+      match api.responseFormat with
+      | ResponseFormat.Markdown =>
+        qedOllamaMarkdown prompts context api options
+      | _ =>
+        qedOllama prompts api options
+    | APIKind.TogetherAI =>
+      qedOpenAI prompts api options
+    | APIKind.OpenAI =>
+      qedOpenAI prompts api options
+    | APIKind.Anthropic =>
+      qedAnthropic prompts api options
 
 end LLMlean

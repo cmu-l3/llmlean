@@ -12,11 +12,17 @@ import LLMlean.API
 
 open Lean LLMlean
 
-/- Calls an LLM API with the given context, prefix and pretty-printed goal. -/
-def runSuggest (goal pre ctx: String) : CoreM (Array (String × Float)) := do
-  let api ← getAPI
+/- Calls an LLM API with the given context, prefix and pretty-printed goal.
+  Optionally allows to provide a specific API for a model to call. -/
+def runSuggest (goal pre ctx: String) (api : Option Config.API := none) :
+    CoreM (Array (String × Float)) := do
+  let api : Config.API ← match api with
+    | some api => pure api
+    -- if the API is provided, use the one found in the configuration.
+    | none => getConfiguredAPI
   let s ← api.tacticGeneration goal ctx pre
   return s
+
 
 /- Display clickable suggestions in the VSCode Lean Infoview.
     When a suggestion is clicked, this widget replaces the `llmstep` call
@@ -149,10 +155,12 @@ open Lean Elab Tactic
     llmstep "apply Continuous" -/
 syntax "llmstep" str: tactic
 elab_rules : tactic
-  | `(tactic | llmstep%$tac $pfx:str) => do
+  | `(tactic | llmstep%$tac $pfx:str ) => do
     match tac.getRange? with
     | some range =>
+      -- Get the source context from the file from which the tactic was called.
       let src := (← getFileMap).source
+      -- Extract the context, from the start of the file to the start of tactic call.
       let ctx := src.extract src.toSubstring.startPos range.start
       addSuggestions tac pfx (← liftMetaMAtMain (llmStep pfx.getString ctx))
     | none =>
