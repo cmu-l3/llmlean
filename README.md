@@ -2,6 +2,10 @@
 
 LLMlean integrates LLMs and Lean for tactic suggestions, proof completion, and more.
 
+## News
+
+- **06/2025**: Added support for [Kimina Prover](https://arxiv.org/abs/2504.11354) models via Ollama
+
 Here's an example of using LLMLean on problems from [Mathematics in Lean](https://github.com/leanprover-community/mathematics_in_lean):
 
 https://github.com/user-attachments/assets/284a8b32-b7a5-4606-8240-effe086f2b82
@@ -55,7 +59,7 @@ model = "wellecks/ntpctx-llama3-8b" # model name from above
 
 Then do steps (3) and (4) above. Now use a tactic described below.
 
-Note that there are multiple Lean models available for download from Ollama. You can find a list of some these models and how to set configuration variables for them in the [Ollama Models](docs/ollama-models.md) document.
+Note that there are multiple Lean models available for download from Ollama, including [Kimina Prover](https://arxiv.org/abs/2504.11354) models which use chain-of-thought reasoning. You can find a list of these models and how to configure them in the [Ollama Models](docs/ollama-models.md) document.
 
 
 ## Tactics
