@@ -11,21 +11,21 @@ structure GenerationOptionsOllama where
   temperature : Float := 0.7
   «stop» : List String := ["[/TAC]", "[/PROOF]", "</think>"]
   /-- Maximum number of tokens to generate. `-1` means no limit. -/
-  num_predict : Int := 200
+  num_predict : Int := 512
 deriving ToJson
 
 structure GenerationOptions where
   temperature : Float := 0.7
   numSamples : Nat := 10
-  «stop» : List String := ["\n", "[/TAC]"]
-  maxTokens : Int := 200
+  «stop» : List String := ["[/TAC]"]
+  maxTokens : Int := 1024
 deriving ToJson
 
 structure GenerationOptionsQed where
   temperature : Float := 0.7
   numSamples : Nat := 10
   «stop» : List String := ["[/PROOF]", "</think>"]
-  maxTokens : Int := 2048
+  maxTokens : Int := 1024
 deriving ToJson
 
 structure OllamaTacticGenerationRequest where
@@ -58,17 +58,17 @@ structure OpenAIQedRequest where
   messages : List OpenAIMessage
   n : Nat := 5
   temperature : Float := 0.7
-  max_tokens : Nat := 512
+  max_tokens : Int := 1024
   stream : Bool := false
-  «stop» : List String := ["\n\n", "[/PROOF]"]
+  «stop» : List String := ["[/PROOF]"]
 deriving ToJson
 
 structure OpenAITacticGenerationRequest where
   model : String
   messages : List OpenAIMessage
-  n : Nat := 5
+  n : Nat := 4
   temperature : Float := 0.7
-  max_tokens : Nat := 100
+  max_tokens : Int := 512
   stream : Bool := false
   «stop» : List String := ["[/TAC]"]
 deriving ToJson
@@ -77,7 +77,7 @@ structure AnthropicQedRequest where
   model : String
   messages : List OpenAIMessage
   temperature : Float := 0.7
-  max_tokens : Nat := 512
+  max_tokens : Nat := 1024
   stream : Bool := false
   stop_sequences : List String := ["[/PROOF]"]
 deriving ToJson
@@ -86,7 +86,7 @@ structure AnthropicTacticGenerationRequest where
   model : String
   messages : List OpenAIMessage
   temperature : Float := 0.7
-  max_tokens : Nat := 100
+  max_tokens : Nat := 512
   stream : Bool := false
   stop_sequences : List String := ["[/TAC]"]
 deriving ToJson
@@ -151,7 +151,7 @@ def getConfiguredOllamaAPI : CoreM API := do
 def getConfiguredTogetherAPI : CoreM API := do
   let url        := (← Config.getEndpoint).getD "https://api.together.xyz/v1/chat/completions"
   let model      := (← Config.getModel).getD "Qwen/Qwen2.5-72B-Instruct-Turbo"
-  let promptKind := (← Config.getPromptKind).getD "detailed"
+  let promptKind := (← Config.getPromptKind).getD "reasoning"
   let apiKey     := (← Config.getApiKey).getD ""
   let api : API := {
     model := model,
@@ -166,7 +166,7 @@ def getConfiguredTogetherAPI : CoreM API := do
 def getConfiguredOpenAIAPI : CoreM API := do
   let url        := (← Config.getEndpoint).getD "https://api.openai.com/v1/chat/completions"
   let model      := (← Config.getModel).getD "gpt-4o"
-  let promptKind := (← Config.getPromptKind).getD "detailed"
+  let promptKind := (← Config.getPromptKind).getD "reasoning"
   let apiKey     := (← Config.getApiKey).getD ""
   let api : API := {
     model := model,
@@ -181,7 +181,7 @@ def getConfiguredOpenAIAPI : CoreM API := do
 def getConfiguredAnthropicAPI : CoreM API := do
   let url        := (← Config.getEndpoint).getD "https://api.anthropic.com/v1/messages"
   let model      := (← Config.getModel).getD "claude-3-7-sonnet-20250219"
-  let promptKind := (← Config.getPromptKind).getD "detailed"
+  let promptKind := (← Config.getPromptKind).getD "reasoning"
   let apiKey     := (← Config.getApiKey).getD ""
   let api : API := {
     model := model,
@@ -599,7 +599,8 @@ def tacticGenerationOpenAI (pfx : String) (prompts : List String)
         }
       ],
       n := options.numSamples,
-      temperature := options.temperature
+      temperature := options.temperature,
+      max_tokens := options.maxTokens
     }
     let res : OpenAIResponse ← post req api.baseUrl api.key
     for result in (parseTacticResponseOpenAI res pfx) do
@@ -622,7 +623,8 @@ def tacticGenerationAnthropic (pfx : String) (prompts : List String)
             content := prompt
           }
         ],
-        temperature := temperature
+        temperature := temperature,
+        max_tokens := options.maxTokens.natAbs
       }
       let res : AnthropicResponse ← post req api.baseUrl api.key
       for result in (parseTacticResponseAnthropic res pfx) do
@@ -737,7 +739,8 @@ def qedOpenAI (prompts : List String)
         }
       ],
       n := options.numSamples,
-      temperature := options.temperature
+      temperature := options.temperature,
+      max_tokens := options.maxTokens
     }
     let res : OpenAIResponse ← post req api.baseUrl api.key
     for result in (parseResponseQedOpenAI res) do
@@ -760,7 +763,8 @@ def qedAnthropic (prompts : List String)
             content := prompt
           }
         ],
-        temperature := temperature
+        temperature := temperature,
+        max_tokens := options.maxTokens.natAbs
       }
       let res : AnthropicResponse ← post req api.baseUrl api.key
       for result in (parseResponseQedAnthropic res) do
@@ -779,7 +783,7 @@ def getGenerationOptions (api : API) : CoreM GenerationOptions := do
   | some n => n
 
   let options : GenerationOptions := {
-    numSamples := numSamples
+    numSamples := numSamples,
   }
   return options
 
