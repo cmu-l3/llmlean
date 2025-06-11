@@ -12,7 +12,8 @@ namespace LLMlean
 
 def defaultMaxTokens : Nat := 1024
 def defaultTemperature : Float := 0.7
-def defaultNumSamples : Nat := 10
+def defaultOllamaSamples : Nat := 4
+def defaultSamples : Nat := 32
 def defaultStopTactic : List String := ["[/TAC]"]
 def defaultStopProof : List String := ["[/PROOF]", "</think>"]
 def defaultStopAll : List String := ["[/TAC]", "[/PROOF]", "</think>"]
@@ -217,12 +218,12 @@ def filterGeneration (s: String) : Bool :=
   !(banned.any fun s' => (s.splitOn s').length > 1)
 
 def getNumSamples (api : API) : CoreM Nat := do
-  let defaultSamples := match api.kind with
-  | APIKind.Ollama => 5
-  | _ => 32
+  let apiDefaultSamples := match api.kind with
+  | APIKind.Ollama => defaultOllamaSamples
+  | _ => defaultSamples
 
   match ← Config.getNumSamples with
-  | none | some 0 => return defaultSamples
+  | none | some 0 => return apiDefaultSamples
   | some n => return n
 
 def getChatGenerationOptions : ChatGenerationOptions := {
@@ -244,11 +245,8 @@ The opening triple backticks may be followed by a language identifier "lean", "l
 The closing triple backticks should be followed by a newline.
 -/
 def getMarkdownLeanCodeBlocks (markdown : String) : List String := Id.run do
-  -- Replace all instances of "lean" with "lean4"
   let markdown := markdown.replace "```lean\n" "```lean4\n"
-  -- Replace all instances of "tactics" with "lean4"
   let markdown := markdown.replace "```tactics\n" "```lean4\n"
-  -- Split the markdown by opening triple backticks
   let parts := (markdown.splitOn "```lean4\n").tailD []
   let mut blocks : List String := []
   -- From each part, delete the closing triple backticks and after
