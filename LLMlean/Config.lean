@@ -36,6 +36,11 @@ register_option llmlean.numSamples : Nat := {
   descr := "If nonzero, number of samples to send to LLM API"
 }
 
+register_option llmlean.maxTokens : Nat := {
+  defValue := 0,
+  descr := "If nonzero, maximum number of tokens parameter for the LLM API"
+}
+
 register_option llmlean.responseFormat : String := {
   defValue := "",
   descr := "If set, response format for the LLM (e.g. standard, markdown)"
@@ -129,6 +134,14 @@ def getNumSamples : CoreM (Option Nat) := do
     | none => Option.map String.toNat! <$> getFromConfigFile `numSamples
     | some numSamples => return numSamples.toNat?
   | numSamples => return some numSamples
+
+def getMaxTokens : CoreM (Option Nat) := do
+  match llmlean.maxTokens.get (← getOptions) with
+  | 0 =>
+    match ← IO.getEnv "LLMLEAN_MAX_TOKENS" with
+    | none => Option.map String.toNat! <$> getFromConfigFile `maxTokens
+    | some maxTokens => return maxTokens.toNat?
+  | maxTokens => return some maxTokens
 
 def getResponseFormat : CoreM (Option String) := do
   match llmlean.responseFormat.get (← getOptions) with

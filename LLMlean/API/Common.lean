@@ -47,12 +47,14 @@ structure ChatGenerationOptions where
   temperature : Float := defaultTemperature
   maxTokens : Nat := defaultMaxTokens
   stopSequences : List String := defaultStopTactic
+  numSamples : Nat := defaultSamples
 deriving ToJson, FromJson
 
 structure ChatGenerationOptionsQed where
   temperature : Float := defaultTemperature
   maxTokens : Nat := defaultMaxTokens
   stopSequences : List String := defaultStopProof
+  numSamples : Nat := defaultSamples
 deriving ToJson, FromJson
 
 structure OpenAIMessage where
@@ -226,17 +228,30 @@ def getNumSamples (api : API) : CoreM Nat := do
   | none | some 0 => return apiDefaultSamples
   | some n => return n
 
-def getChatGenerationOptions : ChatGenerationOptions := {
-  temperature := defaultTemperature,
-  maxTokens := defaultMaxTokens,
-  stopSequences := defaultStopTactic
-}
+def getMaxTokens : CoreM Nat := do
+  match ← Config.getMaxTokens with
+  | none | some 0 => return defaultMaxTokens
+  | some n => return n
 
-def getChatGenerationOptionsQed : ChatGenerationOptionsQed := {
-  temperature := defaultTemperature,
-  maxTokens := defaultMaxTokens,
-  stopSequences := defaultStopProof
-}
+def getChatGenerationOptions (api : API): CoreM ChatGenerationOptions := do
+  let numSamples ← getNumSamples api
+  let maxTokens ← getMaxTokens
+  return {
+    numSamples := numSamples,
+    temperature := defaultTemperature,
+    maxTokens := maxTokens,
+    stopSequences := defaultStopTactic
+  }
+
+def getChatGenerationOptionsQed (api : API) : CoreM ChatGenerationOptionsQed := do
+  let numSamples ← getNumSamples api
+  let maxTokens ← getMaxTokens
+  return {
+    numSamples := numSamples
+    temperature := defaultTemperature,
+    maxTokens := maxTokens,
+    stopSequences := defaultStopProof
+  }
 
 /--
 Parses a string consisting of Markdown text, and extracts the Lean code blocks.
