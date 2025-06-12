@@ -23,7 +23,7 @@ def parseTacticResponseOpenAI (res: OpenAIResponse) (pfx : String) : Array Strin
   (res.choices.map fun x => pfx ++ (splitTac x.message.content)).toArray
 
 def tacticGenerationOpenAI (pfx : String) (prompts : List String)
-(api : API) (numSamples : Nat) (options : ChatGenerationOptions) : IO $ Array (String × Float) := do
+(api : API) (options : ChatGenerationOptions) : IO $ Array (String × Float) := do
   let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
   for prompt in prompts do
     let req : OpenAIGenerationRequest := {
@@ -34,7 +34,7 @@ def tacticGenerationOpenAI (pfx : String) (prompts : List String)
           content := prompt
         }
       ],
-      n := numSamples,
+      n := options.numSamples,
       temperature := options.temperature,
       max_tokens := options.maxTokens,
       stop := options.stopSequences
@@ -54,10 +54,10 @@ def parseTacticResponseAnthropic (res: AnthropicResponse) (pfx : String) : Array
   (res.content.map fun x => pfx ++ (splitTac x.text)).toArray
 
 def tacticGenerationAnthropic (pfx : String) (prompts : List String)
-(api : API) (numSamples : Nat) (options : ChatGenerationOptions) : IO $ Array (String × Float) := do
+(api : API) (options : ChatGenerationOptions) : IO $ Array (String × Float) := do
   let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
   for prompt in prompts do
-    for i in List.range numSamples do
+    for i in List.range options.numSamples do
       let temperature := if i == 1 then 0.0 else options.temperature
       let req : AnthropicGenerationRequest := {
         model := api.model,
@@ -85,10 +85,10 @@ def parseResponseOllama (res: OllamaResponse) : String :=
   splitTac res.response
 
 def tacticGenerationOllama (pfx : String) (prompts : List String)
-(api : API) (numSamples : Nat) (options : ChatGenerationOptions) : IO $ Array (String × Float) := do
+(api : API) (options : ChatGenerationOptions) : IO $ Array (String × Float) := do
   let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
   for prompt in prompts do
-    for i in List.range numSamples do
+    for i in List.range options.numSamples do
       let temperature := if i == 1 then 0.0 else options.temperature
       let req : OllamaGenerationRequest := {
         model := api.model,
@@ -139,10 +139,10 @@ def parseTacticResponseOllamaMarkdown (_context : String) (res: OllamaResponse) 
   return results
 
 def tacticGenerationOllamaMarkdown (_pfx : String) (context : String) (prompts : List String)
-(api : API) (numSamples : Nat) (options : ChatGenerationOptions) : IO $ Array (String × Float) := do
+(api : API) (options : ChatGenerationOptions) : IO $ Array (String × Float) := do
   let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
   for prompt in prompts do
-    for i in List.range numSamples do
+    for i in List.range options.numSamples do
       let temperature := if i == 1 then 0.0 else options.temperature
       let req : OllamaGenerationRequest := {
         model := api.model,
@@ -172,20 +172,19 @@ def LLMlean.Config.API.tacticGeneration
   (api : API) (tacticState : String) (context : String)
   («prefix» : String) : CoreM $ Array (String × Float) := do
   let prompts := makePrompts api.promptKind context tacticState «prefix»
-  let numSamples ← getNumSamples api
-  let options := getChatGenerationOptions
+  let options ← getChatGenerationOptions api
   match api.kind with
     | APIKind.Ollama =>
       match api.responseFormat with
       | ResponseFormat.Markdown =>
-          tacticGenerationOllamaMarkdown «prefix» context prompts api numSamples options
+          tacticGenerationOllamaMarkdown «prefix» context prompts api options
       | _ =>
-          tacticGenerationOllama «prefix» prompts api numSamples options
+          tacticGenerationOllama «prefix» prompts api options
     | APIKind.TogetherAI =>
-      tacticGenerationOpenAI «prefix» prompts api numSamples options
+      tacticGenerationOpenAI «prefix» prompts api options
     | APIKind.OpenAI =>
-      tacticGenerationOpenAI «prefix» prompts api numSamples options
+      tacticGenerationOpenAI «prefix» prompts api options
     | APIKind.Anthropic =>
-      tacticGenerationAnthropic «prefix» prompts api numSamples options
+      tacticGenerationAnthropic «prefix» prompts api options
 
 end LLMlean

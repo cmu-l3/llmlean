@@ -23,7 +23,7 @@ def parseResponseQedOpenAI (res: OpenAIResponse) : Array String :=
   (res.choices.map fun x => (splitProof x.message.content)).toArray
 
 def qedOpenAI (prompts : List String)
-(api : API) (numSamples : Nat) (options : ChatGenerationOptionsQed) : IO $ Array (String × Float) := do
+(api : API) (options : ChatGenerationOptionsQed) : IO $ Array (String × Float) := do
   let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
   for prompt in prompts do
     let req : OpenAIGenerationRequest := {
@@ -34,7 +34,7 @@ def qedOpenAI (prompts : List String)
           content := prompt
         }
       ],
-      n := numSamples,
+      n := options.numSamples,
       temperature := options.temperature,
       max_tokens := options.maxTokens,
       stop := options.stopSequences
@@ -53,10 +53,10 @@ def parseResponseQedAnthropic (res: AnthropicResponse) : Array String :=
   (res.content.map fun x => (splitProof x.text)).toArray
 
 def qedAnthropic (prompts : List String)
-(api : API) (numSamples : Nat) (options : ChatGenerationOptionsQed) : IO $ Array (String × Float) := do
+(api : API) (options : ChatGenerationOptionsQed) : IO $ Array (String × Float) := do
   let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
   for prompt in prompts do
-    for i in List.range numSamples do
+    for i in List.range options.numSamples do
       let temperature := if i == 1 then 0.0 else options.temperature
       let req : AnthropicGenerationRequest := {
         model := api.model,
@@ -84,10 +84,10 @@ def parseResponseQedOllama (res: OllamaResponse) : String :=
   splitProof res.response
 
 def qedOllama (prompts : List String)
-(api : API) (numSamples : Nat) (options : ChatGenerationOptionsQed) : IO $ Array (String × Float) := do
+(api : API) (options : ChatGenerationOptionsQed) : IO $ Array (String × Float) := do
   let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
   for prompt in prompts do
-    for i in List.range numSamples do
+    for i in List.range options.numSamples do
       let temperature := if i == 1 then 0.0 else options.temperature
       let req : OllamaGenerationRequest := {
         model := api.model,
@@ -139,10 +139,10 @@ def extractProofFromMarkdownResponse (context : String) (response : String) : Op
   some lastBlock.trim
 
 def qedOllamaMarkdown (prompts : List String) (context : String)
-(api : API) (numSamples : Nat) (options : ChatGenerationOptionsQed) : IO $ Array (String × Float) := do
+(api : API) (options : ChatGenerationOptionsQed) : IO $ Array (String × Float) := do
   let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
   for prompt in prompts do
-    for i in List.range numSamples do
+    for i in List.range options.numSamples do
       let temperature := if i == 1 then 0.0 else options.temperature
       let req : OllamaGenerationRequest := {
         model := api.model,
@@ -172,20 +172,19 @@ Generates proof completions using the LLM API.
 def LLMlean.Config.API.proofCompletion
   (api : API) (tacticState : String) (context : String) : CoreM $ Array (String × Float) := do
   let prompts := makeQedPrompts api.promptKind context tacticState
-  let numSamples ← getNumSamples api
-  let options := getChatGenerationOptionsQed
+  let options ← getChatGenerationOptionsQed api
   match api.kind with
     | APIKind.Ollama =>
       match api.responseFormat with
       | ResponseFormat.Markdown =>
-        qedOllamaMarkdown prompts context api numSamples options
+        qedOllamaMarkdown prompts context api options
       | _ =>
-        qedOllama prompts api numSamples options
+        qedOllama prompts api options
     | APIKind.TogetherAI =>
-      qedOpenAI prompts api numSamples options
+      qedOpenAI prompts api options
     | APIKind.OpenAI =>
-      qedOpenAI prompts api numSamples options
+      qedOpenAI prompts api options
     | APIKind.Anthropic =>
-      qedAnthropic prompts api numSamples options
+      qedAnthropic prompts api options
 
 end LLMlean
