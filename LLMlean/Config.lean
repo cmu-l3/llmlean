@@ -46,6 +46,16 @@ register_option llmlean.responseFormat : String := {
   descr := "If set, response format for the LLM (e.g. standard, markdown)"
 }
 
+register_option llmlean.mode : String := {
+  defValue := "iterative",
+  descr := "Generation mode: 'parallel' (generate multiple samples) or 'iterative' (refine on errors)"
+}
+
+register_option llmlean.maxIterations : Nat := {
+  defValue := 3,
+  descr := "Maximum refinement iterations in iterative mode (default: 3)"
+}
+
 def getConfigPath : IO (Option System.FilePath) := do
   let home ← IO.getEnv "HOME"
   let appData ← IO.getEnv "APPDATA"
@@ -151,9 +161,43 @@ def getResponseFormat : CoreM (Option String) := do
     | some responseFormat => return some responseFormat
   | responseFormat => return some responseFormat
 
+def getMode : CoreM String := do
+  let modeStr ← match llmlean.mode.get (← getOptions) with
+  | "" =>
+    match ← IO.getEnv "LLMLEAN_MODE" with
+    | none =>
+      match ← getFromConfigFile `mode with
+      | none => pure "parallel"
+      | some mode => pure mode
+    | some mode => pure mode
+  | mode => pure mode
+
+  match modeStr with
+  | "parallel" => return "parallel"
+  | "iterative" => return "iterative"
+  | mode =>
+    logWarning s!"Invalid mode '{mode}', using 'parallel'"
+    return "parallel"
+
+def getMaxIterations : CoreM Nat := do
+  match llmlean.maxIterations.get (← getOptions) with
+  | 0 =>
+    match ← IO.getEnv "LLMLEAN_MAX_ITERATIONS" with
+    | none =>
+      match ← getFromConfigFile `maxIterations with
+      | none => return 3
+      | some n => return n.toNat!
+    | some maxIterations => return maxIterations.toNat!
+  | maxIterations => return maxIterations
+
 /-!
 ## Data Structures for configuration options
 -/
+
+inductive GenerationMode : Type
+  | Parallel     -- Generate multiple samples in parallel
+  | Iterative    -- Generate one sample, refine on errors
+  deriving Inhabited, Repr, BEq
 
 inductive APIKind : Type
   | Ollama
@@ -182,5 +226,12 @@ structure API where
   responseFormat : ResponseFormat := .Standard
   key : String := ""
 deriving Inhabited, Repr
+
+def getModeEnum : CoreM GenerationMode := do
+  let modeStr ← getMode
+  match modeStr with
+  | "parallel" => return GenerationMode.Parallel
+  | "iterative" => return GenerationMode.Iterative
+  | _ => return GenerationMode.Parallel
 
 end LLMlean.Config

@@ -252,4 +252,103 @@ def makeQedPrompts (promptKind : PromptKind) (context : String) (state : String)
   | PromptKind.Instruction => makeQedPromptsInstruct context state
   | PromptKind.MarkdownReasoning => makeQedPromptsMarkdownReasoning context state
 
+def makeQedRefinementPromptsFewShot (context : String) (_state : String)
+    (previousAttempt : String) (errorMsg : String) : List String :=
+  let p1 := s!"/- Previous proof attempt failed.
+Error: {errorMsg}
+
+Previous attempt:
+{previousAttempt}
+
+Please try a different approach.
+-/
+{context}"
+  [p1]
+
+def makeQedRefinementPromptsInstruct (context : String) (state : String)
+    (previousAttempt : String) (errorMsg : String) : List String :=
+  let p1 := s!"/- You are proving a theorem in Lean 4.
+Your previous proof attempt failed with the following error:
+{errorMsg}
+
+Previous attempt:
+[PROOF]
+{previousAttempt}
+[/PROOF]
+
+Please provide a corrected proof that addresses this error.
+Put the proof inside [PROOF]...[/PROOF]
+-/
+[CTX]
+{context}
+[/CTX]
+[STATE]
+{state}
+[/STATE]
+[PROOF]"
+  [p1]
+
+def makeQedRefinementPromptsReasoning (context : String) (state : String)
+    (previousAttempt : String) (errorMsg : String) : List String :=
+  let p1 := s!"/- You are proving a theorem in Lean 4.
+Your previous proof attempt failed with the following error:
+{errorMsg}
+
+Previous attempt:
+{previousAttempt}
+
+Please analyze what went wrong and provide a corrected proof.
+Put your analysis inside [THOUGHTS]...[/THOUGHTS] and the corrected proof inside [PROOF]...[/PROOF].
+Do not include any additional text outside these blocks.
+Write ONLY the proof inside of [PROOF]...[/PROOF]. For instance, do NOT write ```lean4 ... ```.
+-/
+[CTX]
+{context}
+[/CTX]
+[STATE]
+{state}
+[/STATE]
+[THOUGHTS]"
+  [p1]
+
+def makeQedRefinementPromptsMarkdownReasoning (context : String) (state : String)
+    (previousAttempt : String) (errorMsg : String) : List String :=
+  let p1 := s!"You are proving a theorem in Lean 4.
+
+Your previous proof attempt failed with the following error:
+**Error:** {errorMsg}
+
+**Previous attempt:**
+```lean4
+{previousAttempt}
+```
+
+The file contents up to the current tactic are:
+```lean4
+{context}
+```
+
+The current proof state is:
+{state}
+
+Please analyze what went wrong and provide a corrected proof.
+Write your thoughts about the error and then provide the complete corrected proof in a markdown code block.
+
+IMPORTANT: End with your corrected proof in the format:
+```lean4
+<... your corrected proof here...>
+```"
+  [p1]
+
+/--
+Make refinement prompts for proof completion with error context
+-/
+def makeQedRefinementPrompts (promptKind : PromptKind) (context : String) (state : String)
+    (previousAttempt : String) (errorMsg : String) : List String :=
+  match promptKind with
+  | PromptKind.FewShot => makeQedRefinementPromptsFewShot context state previousAttempt errorMsg
+  | PromptKind.Instruction => makeQedRefinementPromptsInstruct context state previousAttempt errorMsg
+  | PromptKind.Reasoning => makeQedRefinementPromptsReasoning context state previousAttempt errorMsg
+  | PromptKind.MarkdownReasoning => makeQedRefinementPromptsMarkdownReasoning context state previousAttempt errorMsg
+
 end LLMlean
