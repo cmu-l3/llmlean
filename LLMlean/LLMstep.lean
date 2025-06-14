@@ -20,6 +20,7 @@ def runSuggest (goal pre ctx: String) (api : Option Config.API := none) :
     | some api => pure api
     -- if the API is provided, use the one found in the configuration.
     | none => getConfiguredAPI
+  
   let s ← api.tacticGeneration goal ctx pre
   return s
 
@@ -70,7 +71,7 @@ inductive CheckResult : Type
   | ProofDone
   | Valid
   | Invalid
-  deriving ToJson, Ord
+  deriving ToJson, Ord, BEq
 
 /- Check whether the suggestion `s` completes the proof, is valid (does
 not result in an error message), or is invalid. -/
@@ -145,6 +146,7 @@ Call the LLM on a goal, asking for suggestions beginning with a prefix.
 def llmStep (pre : String) (ctx : String) (g : MVarId) : MetaM (Array (String × Float)) := do
   let pp := toString (← Meta.ppGoal g)
   runSuggest pp pre ctx
+
 
 open Lean Elab Tactic
 

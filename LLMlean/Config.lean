@@ -6,6 +6,13 @@ open Lean
 
 namespace LLMlean.Config
 
+/-- Default maximum iterations for iterative refinement mode -/
+def defaultMaxIterations : Nat := 3
+
+-- Register trace class for LLMlean
+initialize registerTraceClass `llmlean
+
+
 register_option llmlean.api : String := {
   defValue := "",
   descr := "If set, LLM API kind (e.g. openai, ollama, together)"
@@ -45,6 +52,17 @@ register_option llmlean.responseFormat : String := {
   defValue := "",
   descr := "If set, response format for the LLM (e.g. standard, markdown)"
 }
+
+register_option llmlean.mode : String := {
+  defValue := "iterative",
+  descr := "Generation mode: 'parallel' (generate multiple samples) or 'iterative' (refine on errors)"
+}
+
+register_option llmlean.maxIterations : Nat := {
+  defValue := defaultMaxIterations,
+  descr := s!"Maximum refinement iterations in iterative mode (default: {defaultMaxIterations})"
+}
+
 
 def getConfigPath : IO (Option System.FilePath) := do
   let home ← IO.getEnv "HOME"
@@ -151,9 +169,49 @@ def getResponseFormat : CoreM (Option String) := do
     | some responseFormat => return some responseFormat
   | responseFormat => return some responseFormat
 
+def getMode : CoreM String := do
+  let modeStr ← match llmlean.mode.get (← getOptions) with
+  | "" =>
+    match ← IO.getEnv "LLMLEAN_MODE" with
+    | none =>
+      match ← getFromConfigFile `mode with
+      | none => pure "parallel"
+      | some mode => pure mode
+    | some mode => pure mode
+  | mode => pure mode
+
+  match modeStr with
+  | "parallel" => return "parallel"
+  | "iterative" => return "iterative"
+  | mode =>
+    logWarning s!"Invalid mode '{mode}', using 'parallel'"
+    return "parallel"
+
+def getMaxIterations : CoreM Nat := do
+  let optValue := llmlean.maxIterations.get (← getOptions)
+  -- Check if it's the default value (which means not explicitly set)
+  if optValue == defaultMaxIterations then
+    -- Try environment variable first
+    match ← IO.getEnv "LLMLEAN_MAX_ITERATIONS" with
+    | some maxIterations => return maxIterations.toNat!
+    | none =>
+      -- Then try config file
+      match ← getFromConfigFile `maxIterations with
+      | some n => return n.toNat!
+      | none => return defaultMaxIterations
+  else
+    -- Use the explicitly set value
+    return optValue
+
+
 /-!
 ## Data Structures for configuration options
 -/
+
+inductive GenerationMode : Type
+  | Parallel     -- Generate multiple samples in parallel
+  | Iterative    -- Generate one sample, refine on errors
+  deriving Inhabited, Repr, BEq
 
 inductive APIKind : Type
   | Ollama
@@ -182,5 +240,35 @@ structure API where
   responseFormat : ResponseFormat := .Standard
   key : String := ""
 deriving Inhabited, Repr
+
+def getModeEnum : CoreM GenerationMode := do
+  let modeStr ← getMode
+  match modeStr with
+  | "parallel" => return GenerationMode.Parallel
+  | "iterative" => return GenerationMode.Iterative
+  | _ => return GenerationMode.Parallel
+
+register_option llmlean.verbose : Bool := {
+  defValue := false,
+  descr := "Enable verbose output for LLM interactions and iterative refinement"
+}
+
+def getVerbose : CoreM Bool := do
+  if llmlean.verbose.get (← getOptions) then
+    return true
+  else
+    match ← IO.getEnv "LLMLEAN_VERBOSE" with
+    | some "true" | some "1" => return true
+    | _ =>
+      match ← getFromConfigFile `verbose with
+      | some "true" | some "1" => return true
+      | _ => return false
+
+/-- Print a verbose message using trace if verbose mode is enabled -/
+def verbosePrint (msg : String) : CoreM Unit := do
+  if ← getVerbose then
+    -- Temporarily enable the trace option and use trace
+    withOptions (fun opts => opts.setBool `trace.llmlean true) do
+      trace[llmlean] msg
 
 end LLMlean.Config

@@ -187,4 +187,26 @@ def LLMlean.Config.API.proofCompletion
     | APIKind.Anthropic =>
       qedAnthropic prompts api options
 
+/--
+Generates proof completions with refinement context using the LLM API.
+-/
+def LLMlean.Config.API.proofCompletionRefinement
+  (api : API) (tacticState : String) (context : String)
+  (previousAttempt : String) (errorMsg : String) : CoreM $ Array (String × Float) := do
+  let prompts := makeQedRefinementPrompts api.promptKind context tacticState previousAttempt errorMsg
+  let options ← getChatGenerationOptionsQed api
+  match api.kind with
+    | APIKind.Ollama =>
+      match api.responseFormat with
+      | ResponseFormat.Markdown =>
+        qedOllamaMarkdown prompts context api options
+      | _ =>
+        qedOllama prompts api options
+    | APIKind.TogetherAI =>
+      qedOpenAI prompts api options
+    | APIKind.OpenAI =>
+      qedOpenAI prompts api options
+    | APIKind.Anthropic =>
+      qedAnthropic prompts api options
+
 end LLMlean

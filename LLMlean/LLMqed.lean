@@ -6,6 +6,7 @@ import Lean.Meta.Tactic.TryThis
 
 import LLMlean.API
 import LLMlean.LLMstep
+import LLMlean.IterativeRefinement
 
 open Lean LLMlean
 
@@ -96,6 +97,17 @@ def llmQed (ctx : String) (g : MVarId) : MetaM (Array (String × Float)) := do
   let pp := toString (← Meta.ppGoal g)
   runTactic pp ctx
 
+/--
+Call the LLM on a goal using iterative refinement for proof completion.
+-/
+def llmQedIterative (ctx : String) (g : MVarId) : Elab.Tactic.TacticM (Array (String × Float)) := do
+  let pp := toString (← Meta.ppGoal g)
+  let api ← getConfiguredAPI
+  let maxIterations ← Config.getMaxIterations
+  let suggestions ← iterativeRefinementProofInTactic pp ctx api maxIterations
+  -- Convert to array with dummy scores
+  return suggestions.toArray.map (·, 1.0)
+
 open Lean Elab Tactic
 
 /- `llmqed` tactic. -/
@@ -106,6 +118,29 @@ elab_rules : tactic
     | some range =>
       let src := (← getFileMap).source
       let ctx := src.extract src.toSubstring.startPos range.start
-      addSuggestions' tac (← liftMetaMAtMain (llmQed ctx))
+      -- Check which mode to use
+      let mode ← Config.getModeEnum
+      let modeStr ← Config.getMode
+      Config.verbosePrint s!"Using mode: {modeStr}"
+      let suggestions ← match mode with
+      | Config.GenerationMode.Iterative =>
+        Config.verbosePrint s!"Starting iterative refinement..."
+        -- Use iterative refinement
+        llmQedIterative ctx (← getMainGoal)
+      | Config.GenerationMode.Parallel =>
+        Config.verbosePrint s!"Using parallel generation..."
+        -- Use parallel generation
+        liftMetaMAtMain (llmQed ctx)
+      addSuggestions' tac suggestions
     | none =>
-      addSuggestions' tac (← liftMetaMAtMain (llmQed ""))
+      let mode ← Config.getModeEnum
+      let modeStr ← Config.getMode
+      Config.verbosePrint s!"Using mode: {modeStr} (no context)"
+      let suggestions ← match mode with
+      | Config.GenerationMode.Iterative =>
+        Config.verbosePrint s!"Starting iterative refinement..."
+        llmQedIterative "" (← getMainGoal)
+      | Config.GenerationMode.Parallel =>
+        Config.verbosePrint s!"Using parallel generation..."
+        liftMetaMAtMain (llmQed "")
+      addSuggestions' tac suggestions
