@@ -172,7 +172,7 @@ def LLMlean.Config.API.tacticGeneration
   (api : API) (tacticState : String) (context : String)
   («prefix» : String) : CoreM $ Array (String × Float) := do
   let prompts := makePrompts api.promptKind context tacticState «prefix»
-  let options ← getChatGenerationOptions api
+  let options ← getChatGenerationOptions api TacticKind.LLMStep
   match api.kind with
     | APIKind.Ollama =>
       match api.responseFormat with

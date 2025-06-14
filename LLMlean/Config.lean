@@ -271,4 +271,117 @@ def verbosePrint (msg : String) : CoreM Unit := do
     withOptions (fun opts => opts.setBool `trace.llmlean true) do
       trace[llmlean] msg
 
+/-!
+## Tactic Kind
+-/
+
+inductive TacticKind : Type
+  | LLMStep   -- For llmstep tactic (single-step suggestions)
+  | LLMQed    -- For llmqed tactic (full proof generation)
+  deriving Inhabited, Repr, BEq
+
+/-!
+## Default Values for APIs based on Tactic
+-/
+
+/-- Default configuration for each API -/
+structure APIDefaults where
+  model : String
+  mode : GenerationMode
+  promptKind : PromptKind
+  responseFormat : ResponseFormat
+  numSamples : Nat
+  maxTokens : Nat
+  endpoint : String
+  deriving Inhabited, Repr
+
+/-- Get default configuration based on API kind and tactic kind -/
+def getDefaultsForAPI (apiKind : APIKind) (tactic : TacticKind) : APIDefaults :=
+  match apiKind, tactic with
+  -- Ollama defaults
+  | APIKind.Ollama, TacticKind.LLMStep => {
+      model := "wellecks/ntpctx-llama3-8b"
+      mode := GenerationMode.Parallel
+      promptKind := PromptKind.Instruction
+      responseFormat := ResponseFormat.Standard
+      numSamples := 4
+      maxTokens := 128
+      endpoint := "http://localhost:11434/api/generate"
+    }
+  | APIKind.Ollama, TacticKind.LLMQed => {
+      model := "wellecks/ntpctx-llama3-8b"
+      mode := GenerationMode.Iterative
+      promptKind := PromptKind.Instruction
+      responseFormat := ResponseFormat.Standard
+      numSamples := 1
+      maxTokens := 256
+      endpoint := "http://localhost:11434/api/generate"
+    }
+  -- OpenAI defaults
+  | APIKind.OpenAI, TacticKind.LLMStep => {
+      model := "gpt-4o"
+      mode := GenerationMode.Parallel
+      promptKind := PromptKind.Reasoning
+      responseFormat := ResponseFormat.Standard
+      numSamples := 16
+      maxTokens := 512
+      endpoint := "https://api.openai.com/v1/chat/completions"
+    }
+  | APIKind.OpenAI, TacticKind.LLMQed => {
+      model := "gpt-4o"
+      mode := GenerationMode.Parallel
+      promptKind := PromptKind.Reasoning
+      responseFormat := ResponseFormat.Standard
+      numSamples := 16
+      maxTokens := 2048
+      endpoint := "https://api.openai.com/v1/chat/completions"
+    }
+  -- Anthropic defaults
+  | APIKind.Anthropic, TacticKind.LLMStep => {
+      model := "claude-sonnet-4-20250514"
+      mode := GenerationMode.Parallel
+      promptKind := PromptKind.Reasoning
+      responseFormat := ResponseFormat.Standard
+      numSamples := 1
+      maxTokens := 512
+      endpoint := "https://api.anthropic.com/v1/messages"
+    }
+  | APIKind.Anthropic, TacticKind.LLMQed => {
+      model := "claude-opus-4-20250514"
+      mode := GenerationMode.Iterative
+      promptKind := PromptKind.Reasoning
+      responseFormat := ResponseFormat.Standard
+      numSamples := 1
+      maxTokens := 2048
+      endpoint := "https://api.anthropic.com/v1/messages"
+    }
+  -- Together defaults
+  | APIKind.TogetherAI, TacticKind.LLMStep => {
+      model := "Qwen/Qwen2.5-72B-Instruct-Turbo"
+      mode := GenerationMode.Parallel
+      promptKind := PromptKind.Reasoning
+      responseFormat := ResponseFormat.Standard
+      numSamples := 32
+      maxTokens := 512
+      endpoint := "https://api.together.xyz/v1/chat/completions"
+    }
+  | APIKind.TogetherAI, TacticKind.LLMQed => {
+      model := "Qwen/Qwen2.5-72B-Instruct-Turbo"
+      mode := GenerationMode.Parallel
+      promptKind := PromptKind.Reasoning
+      responseFormat := ResponseFormat.Standard
+      numSamples := 1
+      maxTokens := 1024
+      endpoint := "https://api.together.xyz/v1/chat/completions"
+    }
+
+/-- Parse API kind from string -/
+def parseAPIKind (apiStr : String) : Option APIKind :=
+  match apiStr.toLower with
+  | "ollama" => some APIKind.Ollama
+  | "openai" => some APIKind.OpenAI
+  | "anthropic" => some APIKind.Anthropic
+  | "together" => some APIKind.TogetherAI
+  | _ => none
+
 end LLMlean.Config
