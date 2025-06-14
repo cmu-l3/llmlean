@@ -4,6 +4,7 @@ LLMlean integrates LLMs and Lean for tactic suggestions, proof completion, and m
 
 ## News
 
+- **06/2025**: Introduced iterative refinement mode for proof generation
 - **06/2025**: Added support for [Kimina Prover](https://arxiv.org/abs/2504.11354) models via Ollama (thanks to @BoltonBailey)
 
 Here's an example of using LLMLean on problems from [Mathematics in Lean](https://github.com/leanprover-community/mathematics_in_lean):
@@ -84,7 +85,24 @@ Complete the current proof via `llmqed`. Examples:
 
 The suggestions are checked in Lean.
 
-*For the best performance, especially for the `llmqed` tactic, we recommend using the Open AI API.*
+### Proof Generation Modes
+
+LLMLean supports two modes for proof generation with `llmqed`:
+- **Parallel mode**: Generates multiple proof attempts in parallel
+- **Iterative refinement mode**: Generates one proof attempt, analyzes any errors, and refines the proof based on feedback
+
+To configure:
+```toml
+# In ~/.config/llmlean/config.toml
+mode = "iterative"  # or "parallel"
+```
+
+Enable verbose output to see the refinement process:
+```lean
+set_option llmlean.verbose true
+```
+
+*For the best performance, especially for the `llmqed` tactic, we recommend using Anthropic Claude with iterative refinement mode.*
 
 
 

@@ -22,8 +22,17 @@ Example:
   - Example for Anthropic: `claude-3-7-sonnet-20250219`
 - `numSamples`:
   - Example: `10`
+- `mode`:
+  - `parallel`: Generate multiple proof attempts in parallel
+  - `iterative`: Generate and refine proofs based on error feedback
+- `maxIterations`:
+  - Number of refinement iterations in iterative mode (e.g., `3`)
+- `verbose`:
+  - `true`: Show detailed LLM interaction and refinement steps
 
-Set each variable in the configuration file, as indicated in [README](../README.md). Alternatively, set environment variables `LLMLEAN_API`, `LLMLEAN_API_KEY`, `LLMLEAN_ENDPOINT`, `LLMLEAN_PROMPT`, `LLMLEAN_MODEL`, and `LLMLEAN_NUM_SAMPLES` respectively, or enter `set_option llmlean.<relevant-config> <value>` before `llmstep`/`llmqed` is called.
+Set each variable in the configuration file, as indicated in [README](../README.md). Alternatively, set environment variables `LLMLEAN_API`, `LLMLEAN_API_KEY`, `LLMLEAN_ENDPOINT`, `LLMLEAN_PROMPT`, `LLMLEAN_MODEL`, `LLMLEAN_NUM_SAMPLES`, `LLMLEAN_MODE`, `LLMLEAN_MAX_ITERATIONS`, and `LLMLEAN_VERBOSE` respectively, or enter `set_option llmlean.<relevant-config> <value>` before `llmstep`/`llmqed` is called.
+
+**Note on Iterative Refinement**: This mode works particularly well with models that can understand and learn from error messages. We recommend using instruction-tuned models with the `reasoning` prompt type for best results.
 
 #### LLM on your laptop
 - `api`:
