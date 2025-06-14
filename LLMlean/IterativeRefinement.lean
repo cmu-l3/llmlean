@@ -48,10 +48,9 @@ def extractErrorInfo (messages : MessageLog) (hasUnsolvedGoals : Bool := false) 
       "Tactic succeeded but did not complete the proof"
     else
       "Unknown error"
-  else
-    String.intercalate "\n\n-----" errorMsgs
+    else
+      String.intercalate "\n\n-----" errorMsgs
 
-  IO.println s!"errorMsgs: {errorMsgs}"
   return {
     message := errorMessage
     hasUnsolvedGoals := hasUnsolvedGoals
@@ -84,7 +83,7 @@ structure CheckResultWithError where
 
 /-- Check if a proof completion is valid and get error messages -/
 def checkProofCompletion (proof : String) : Elab.Tactic.TacticM CheckResultWithError := do
-  let (result, messages) ← withoutModifyingState do
+  let (result, errorMsg) ← withoutModifyingState do
     try
       -- Same validation as in LLMqed
       let s' := "(" ++ (proof.replace "\n" "\n ") ++ " )"
@@ -95,45 +94,32 @@ def checkProofCompletion (proof : String) : Elab.Tactic.TacticM CheckResultWithE
             let goals ← Elab.Tactic.getUnsolvedGoals
             let messages := (← getThe Core.State).messages
             if messages.hasErrors then
-              pure (CheckResult.Invalid, messages)
+              let errorInfo ← extractErrorInfo messages false
+              pure (CheckResult.Invalid, errorInfo.message)
             else if goals.isEmpty then
-              pure (CheckResult.ProofDone, messages)
+              pure (CheckResult.ProofDone, "")
             else
-              pure (CheckResult.Valid, messages)
+              pure (CheckResult.Valid, "Tactic valid but proof incomplete")
           catch e =>
-            let messages := (← getThe Core.State).messages
-            pure (CheckResult.Invalid, messages)
+            let baseError ← e.toMessageData.toString
+            let errorStr := if (baseError.replace "internal exception #5" "") != baseError then
+              s!"Internal error (likely malformed tactic or unknown identifier)."
+            else
+              baseError
+            pure (CheckResult.Invalid, errorStr)
         | Except.error parseError =>
-          pure (CheckResult.Invalid, MessageLog.empty.add {
-            fileName := ""
-            pos := ⟨0, 0⟩
-            severity := MessageSeverity.error
-            data := parseError
-          })
+          pure (CheckResult.Invalid, parseError)
       catch e =>
-        pure (CheckResult.Invalid, MessageLog.empty.add {
-          fileName := ""
-          pos := ⟨0, 0⟩
-          severity := MessageSeverity.error
-          data := e.toMessageData
-        })
-
-  -- Extract error message if invalid
-  let errorMsg ← if result == CheckResult.Invalid then
-    let errorInfo ← extractErrorInfo messages false
-    pure errorInfo.message
-  else if result == CheckResult.Valid then
-    pure "Tactic valid but proof incomplete"
-  else
-    pure ""
+        let errorStr ← e.toMessageData.toString
+        pure (CheckResult.Invalid, errorStr)
 
   return { result := result, errorMsg := errorMsg }
 
 /-- Main iterative refinement loop for proof completion -/
 def iterativeRefinementProofInTactic (tacticState : String) (context : String)
     (api : Config.API) (maxIterations : Nat) : Elab.Tactic.TacticM (List String) := do
-  IO.println s!"[Iterative Refinement] Starting with max iterations: {maxIterations}"
-  IO.println s!"[Iterative Refinement] Original goal: {tacticState}"
+  Config.verbosePrint s!"Starting with max iterations: {maxIterations}"
+  Config.verbosePrint s!"Original goal: {tacticState}"
 
   let mut ctx : RefinementContext := {
     originalGoal := tacticState
@@ -145,40 +131,39 @@ def iterativeRefinementProofInTactic (tacticState : String) (context : String)
 
   for i in [0:maxIterations] do
     ctx := { ctx with iteration := i }
-    IO.println s!"\n[Iterative Refinement] === Iteration {i + 1}/{maxIterations} ==="
-
+    Config.verbosePrint s!"\n=== Iteration {i + 1}/{maxIterations} ==="
     -- Generate attempt based on iteration
     let proof ← if i == 0 then
       -- First attempt: use normal API
-      IO.println s!"[Iterative Refinement] Calling LLM (first attempt)..."
+      Config.verbosePrint "Calling LLM (first attempt)..."
       generateSingleProofAttempt api tacticState context
     else
       -- Refinement: use dedicated refinement API
       let (lastAttempt, lastError) := ctx.previousAttempts.head!
-      IO.println s!"[Iterative Refinement] Previous attempt:\n{lastAttempt}"
-      IO.println s!"[Iterative Refinement] Error: {lastError}"
-      IO.println s!"[Iterative Refinement] Calling LLM with refinement context..."
+      Config.verbosePrint s!"Previous attempt:\n{lastAttempt}"
+      Config.verbosePrint s!"Error: {lastError}"
+      Config.verbosePrint "Calling LLM with refinement context..."
       generateRefinementProofAttempt api tacticState context lastAttempt lastError
 
-    IO.println s!"[Iterative Refinement] LLM response:\n{proof}"
+    Config.verbosePrint s!"LLM response:\n{proof}"
 
     -- Check if the proof is valid
     let checkResult ← checkProofCompletion proof
     match checkResult.result with
     | CheckResult.ProofDone =>
-      IO.println s!"[Iterative Refinement] ✓ Proof complete!"
+      Config.verbosePrint "✓ Proof complete!"
       validProofs := validProofs ++ [proof]
       break
     | CheckResult.Valid =>
-      IO.println s!"[Iterative Refinement] ⚠ Valid tactic but proof not complete, continuing..."
-      IO.println s!"[Iterative Refinement] Reason: {checkResult.errorMsg}"
+      Config.verbosePrint "⚠ Valid tactic but proof not complete, continuing..."
+      Config.verbosePrint s!"Reason: {checkResult.errorMsg}"
       ctx := { ctx with previousAttempts := (proof, checkResult.errorMsg) :: ctx.previousAttempts }
     | CheckResult.Invalid =>
-      IO.println s!"[Iterative Refinement] ✗ Invalid proof, continuing..."
-      IO.println s!"[Iterative Refinement] Error: {checkResult.errorMsg}"
+      Config.verbosePrint "✗ Invalid proof, continuing..."
+      Config.verbosePrint s!"Error: {checkResult.errorMsg}"
       ctx := { ctx with previousAttempts := (proof, checkResult.errorMsg) :: ctx.previousAttempts }
 
-  IO.println s!"[Iterative Refinement] Completed. Generated {validProofs.length} valid proof(s)."
+  Config.verbosePrint s!"Completed. Generated {validProofs.length} valid proof(s)."
   return validProofs
 
 

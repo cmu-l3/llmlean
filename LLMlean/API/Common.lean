@@ -220,13 +220,21 @@ def filterGeneration (s: String) : Bool :=
   !(banned.any fun s' => (s.splitOn s').length > 1)
 
 def getNumSamples (api : API) : CoreM Nat := do
-  let apiDefaultSamples := match api.kind with
-  | APIKind.Ollama => defaultOllamaSamples
-  | _ => defaultSamples
+  -- Check if we're in iterative mode
+  let mode ← Config.getModeEnum
+  match mode with
+  | Config.GenerationMode.Iterative =>
+    -- In iterative mode, always use 1 sample
+    return 1
+  | Config.GenerationMode.Parallel =>
+    -- In parallel mode, use configured samples
+    let apiDefaultSamples := match api.kind with
+    | APIKind.Ollama => defaultOllamaSamples
+    | _ => defaultSamples
 
-  match ← Config.getNumSamples with
-  | none | some 0 => return apiDefaultSamples
-  | some n => return n
+    match ← Config.getNumSamples with
+    | none | some 0 => return apiDefaultSamples
+    | some n => return n
 
 def getMaxTokens : CoreM Nat := do
   match ← Config.getMaxTokens with

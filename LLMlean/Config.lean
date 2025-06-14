@@ -6,6 +6,13 @@ open Lean
 
 namespace LLMlean.Config
 
+/-- Default maximum iterations for iterative refinement mode -/
+def defaultMaxIterations : Nat := 3
+
+-- Register trace class for LLMlean
+initialize registerTraceClass `llmlean
+
+
 register_option llmlean.api : String := {
   defValue := "",
   descr := "If set, LLM API kind (e.g. openai, ollama, together)"
@@ -52,9 +59,10 @@ register_option llmlean.mode : String := {
 }
 
 register_option llmlean.maxIterations : Nat := {
-  defValue := 3,
-  descr := "Maximum refinement iterations in iterative mode (default: 3)"
+  defValue := defaultMaxIterations,
+  descr := s!"Maximum refinement iterations in iterative mode (default: {defaultMaxIterations})"
 }
+
 
 def getConfigPath : IO (Option System.FilePath) := do
   let home ← IO.getEnv "HOME"
@@ -180,15 +188,21 @@ def getMode : CoreM String := do
     return "parallel"
 
 def getMaxIterations : CoreM Nat := do
-  match llmlean.maxIterations.get (← getOptions) with
-  | 0 =>
+  let optValue := llmlean.maxIterations.get (← getOptions)
+  -- Check if it's the default value (which means not explicitly set)
+  if optValue == defaultMaxIterations then
+    -- Try environment variable first
     match ← IO.getEnv "LLMLEAN_MAX_ITERATIONS" with
-    | none =>
-      match ← getFromConfigFile `maxIterations with
-      | none => return 3
-      | some n => return n.toNat!
     | some maxIterations => return maxIterations.toNat!
-  | maxIterations => return maxIterations
+    | none =>
+      -- Then try config file
+      match ← getFromConfigFile `maxIterations with
+      | some n => return n.toNat!
+      | none => return defaultMaxIterations
+  else
+    -- Use the explicitly set value
+    return optValue
+
 
 /-!
 ## Data Structures for configuration options
@@ -233,5 +247,28 @@ def getModeEnum : CoreM GenerationMode := do
   | "parallel" => return GenerationMode.Parallel
   | "iterative" => return GenerationMode.Iterative
   | _ => return GenerationMode.Parallel
+
+register_option llmlean.verbose : Bool := {
+  defValue := false,
+  descr := "Enable verbose output for LLM interactions and iterative refinement"
+}
+
+def getVerbose : CoreM Bool := do
+  if llmlean.verbose.get (← getOptions) then
+    return true
+  else
+    match ← IO.getEnv "LLMLEAN_VERBOSE" with
+    | some "true" | some "1" => return true
+    | _ =>
+      match ← getFromConfigFile `verbose with
+      | some "true" | some "1" => return true
+      | _ => return false
+
+/-- Print a verbose message using trace if verbose mode is enabled -/
+def verbosePrint (msg : String) : CoreM Unit := do
+  if ← getVerbose then
+    -- Temporarily enable the trace option and use trace
+    withOptions (fun opts => opts.setBool `trace.llmlean true) do
+      trace[llmlean] msg
 
 end LLMlean.Config

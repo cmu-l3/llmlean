@@ -121,26 +121,26 @@ elab_rules : tactic
       -- Check which mode to use
       let mode ← Config.getModeEnum
       let modeStr ← Config.getMode
-      IO.println s!"[LLMqed] Using mode: {modeStr}"
+      Config.verbosePrint s!"Using mode: {modeStr}"
       let suggestions ← match mode with
       | Config.GenerationMode.Iterative =>
-        IO.println s!"[LLMqed] Starting iterative refinement..."
+        Config.verbosePrint s!"Starting iterative refinement..."
         -- Use iterative refinement
         llmQedIterative ctx (← getMainGoal)
       | Config.GenerationMode.Parallel =>
-        IO.println s!"[LLMqed] Using parallel generation..."
+        Config.verbosePrint s!"Using parallel generation..."
         -- Use parallel generation
         liftMetaMAtMain (llmQed ctx)
       addSuggestions' tac suggestions
     | none =>
       let mode ← Config.getModeEnum
       let modeStr ← Config.getMode
-      IO.println s!"[LLMqed] Using mode: {modeStr} (no context)"
+      Config.verbosePrint s!"Using mode: {modeStr} (no context)"
       let suggestions ← match mode with
       | Config.GenerationMode.Iterative =>
-        IO.println s!"[LLMqed] Starting iterative refinement..."
+        Config.verbosePrint s!"Starting iterative refinement..."
         llmQedIterative "" (← getMainGoal)
       | Config.GenerationMode.Parallel =>
-        IO.println s!"[LLMqed] Using parallel generation..."
+        Config.verbosePrint s!"Using parallel generation..."
         liftMetaMAtMain (llmQed "")
       addSuggestions' tac suggestions
