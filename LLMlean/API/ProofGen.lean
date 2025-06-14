@@ -172,7 +172,7 @@ Generates proof completions using the LLM API.
 def LLMlean.Config.API.proofCompletion
   (api : API) (tacticState : String) (context : String) : CoreM $ Array (String × Float) := do
   let prompts := makeQedPrompts api.promptKind context tacticState
-  let options ← getChatGenerationOptionsQed api
+  let options ← getChatGenerationOptionsQed api TacticKind.LLMQed
   match api.kind with
     | APIKind.Ollama =>
       match api.responseFormat with
@@ -194,7 +194,7 @@ def LLMlean.Config.API.proofCompletionRefinement
   (api : API) (tacticState : String) (context : String)
   (previousAttempt : String) (errorMsg : String) : CoreM $ Array (String × Float) := do
   let prompts := makeQedRefinementPrompts api.promptKind context tacticState previousAttempt errorMsg
-  let options ← getChatGenerationOptionsQed api
+  let options ← getChatGenerationOptionsQed api TacticKind.LLMQed
   match api.kind with
     | APIKind.Ollama =>
       match api.responseFormat with

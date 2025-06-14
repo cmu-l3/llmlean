@@ -12,7 +12,7 @@ open Lean LLMlean
 
 /- Calls an LLM API with the given context, prefix and pretty-printed goal. -/
 def runTactic (goal ctx : String) : CoreM (Array (String × Float)) := do
-  let api ← getConfiguredAPI
+  let api ← getConfiguredAPI Config.TacticKind.LLMQed
   let s ← api.proofCompletion goal ctx
   return s
 
@@ -102,7 +102,7 @@ Call the LLM on a goal using iterative refinement for proof completion.
 -/
 def llmQedIterative (ctx : String) (g : MVarId) : Elab.Tactic.TacticM (Array (String × Float)) := do
   let pp := toString (← Meta.ppGoal g)
-  let api ← getConfiguredAPI
+  let api ← getConfiguredAPI Config.TacticKind.LLMQed
   let maxIterations ← Config.getMaxIterations
   let suggestions ← iterativeRefinementProofInTactic pp ctx api maxIterations
   -- Convert to array with dummy scores

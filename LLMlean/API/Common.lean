@@ -115,82 +115,45 @@ def getResponseFormat (stringArg: String) : ResponseFormat :=
   | "markdown" => ResponseFormat.Markdown
   | _ => ResponseFormat.Standard
 
-/-- Gets an Ollama API, with details coming either from environment variables or the contents of the `config.toml` file. -/
-def getConfiguredOllamaAPI : CoreM API := do
-  let url        := (← Config.getEndpoint).getD "http://localhost:11434/api/generate"
-  let model      := (← Config.getModel).getD "wellecks/ntpctx-llama3-8b"
-  let promptKind := (← Config.getPromptKind).getD "instruction"
-  let apiKey     := (← Config.getApiKey).getD ""
-  -- Get response format from config, or auto-detect based on model
+/-- Gets the configured API, with details coming either from environment variables or the contents of the `config.toml` file. -/
+def getConfiguredAPI (tacticKind : TacticKind) : CoreM API := do
+  -- Get API kind from config
+  let apiKindStr := (← Config.getApiKind).getD "ollama"
+  let some apiKind := Config.parseAPIKind apiKindStr
+    | throwError s!"Unknown API kind: {apiKindStr}"
+  
+  -- Get defaults for this API and tactic combination
+  let defaults := Config.getDefaultsForAPI apiKind tacticKind
+  
+  -- Override defaults with any configured values
+  let url := (← Config.getEndpoint).getD defaults.endpoint
+  let model := (← Config.getModel).getD defaults.model
+  let apiKey := (← Config.getApiKey).getD ""
+  
+  -- Handle prompt kind
+  let promptKindStr := (← Config.getPromptKind).getD ""
+  let promptKind := if promptKindStr != "" then
+    getPromptKind promptKindStr
+  else
+    defaults.promptKind
+  
+  -- Handle response format
   let responseFormatStr := (← Config.getResponseFormat).getD ""
   let responseFormat := if responseFormatStr != "" then
     getResponseFormat responseFormatStr
   else
-    ResponseFormat.Standard
+    defaults.responseFormat
+  
   let api : API := {
     model := model,
     baseUrl := url,
-    kind := APIKind.Ollama,
-    promptKind := getPromptKind promptKind,
+    kind := apiKind,
+    promptKind := promptKind,
     responseFormat := responseFormat,
     key := apiKey
   }
+  
   return api
-
-/-- Gets a TogetherAI API, with details coming either from environment variables or the contents of the `config.toml` file. -/
-def getConfiguredTogetherAPI : CoreM API := do
-  let url        := (← Config.getEndpoint).getD "https://api.together.xyz/v1/chat/completions"
-  let model      := (← Config.getModel).getD "Qwen/Qwen2.5-72B-Instruct-Turbo"
-  let promptKind := (← Config.getPromptKind).getD "reasoning"
-  let apiKey     := (← Config.getApiKey).getD ""
-  let api : API := {
-    model := model,
-    baseUrl := url,
-    kind := APIKind.TogetherAI,
-    promptKind := getPromptKind promptKind,
-    key := apiKey
-  }
-  return api
-
-/-- Gets an OpenAI API, with details coming either from environment variables or the contents of the `config.toml` file. -/
-def getConfiguredOpenAIAPI : CoreM API := do
-  let url        := (← Config.getEndpoint).getD "https://api.openai.com/v1/chat/completions"
-  let model      := (← Config.getModel).getD "gpt-4o"
-  let promptKind := (← Config.getPromptKind).getD "reasoning"
-  let apiKey     := (← Config.getApiKey).getD ""
-  let api : API := {
-    model := model,
-    baseUrl := url,
-    kind := APIKind.OpenAI,
-    promptKind := getPromptKind promptKind,
-    key := apiKey
-  }
-  return api
-
-/-- Gets an Anthropic API, with details coming either from environment variables or the contents of the `config.toml` file. -/
-def getConfiguredAnthropicAPI : CoreM API := do
-  let url        := (← Config.getEndpoint).getD "https://api.anthropic.com/v1/messages"
-  let model      := (← Config.getModel).getD "claude-3-7-sonnet-20250219"
-  let promptKind := (← Config.getPromptKind).getD "reasoning"
-  let apiKey     := (← Config.getApiKey).getD ""
-  let api : API := {
-    model := model,
-    baseUrl := url,
-    kind := APIKind.Anthropic,
-    promptKind := getPromptKind promptKind,
-    key := apiKey
-  }
-  return api
-
-/-- Gets the configured API, with details coming either from environment variables or the contents of the `config.toml` file. -/
-def getConfiguredAPI : CoreM API := do
-  let apiKind := (← Config.getApiKind).getD "ollama"
-  match apiKind with
-  | "ollama" => getConfiguredOllamaAPI
-  | "together" => getConfiguredTogetherAPI
-  | "anthropic" => getConfiguredAnthropicAPI
-  | "openai" => getConfiguredOpenAIAPI
-  | _ => getConfiguredOllamaAPI -- TODO: This should throw an error of some kind.
 
 def post {α β : Type} [ToJson α] [FromJson β] (req : α) (url : String) (apiKey : String): IO β := do
   let out ← IO.Process.output {
@@ -219,31 +182,55 @@ def filterGeneration (s: String) : Bool :=
   let banned := ["sorry", "admit", "▅"]
   !(banned.any fun s' => (s.splitOn s').length > 1)
 
-def getNumSamples (api : API) : CoreM Nat := do
-  -- Check if we're in iterative mode
-  let mode ← Config.getModeEnum
+def getNumSamples (api : API) (tacticKind : TacticKind) : CoreM Nat := do
+  -- Get defaults for this API and tactic
+  let defaults := Config.getDefaultsForAPI api.kind tacticKind
+  
+  -- Check if mode is explicitly set
+  let modeStr ← Config.getMode
+  let mode := if modeStr == "iterative" then
+    Config.GenerationMode.Iterative
+  else if modeStr == "parallel" then
+    Config.GenerationMode.Parallel
+  else
+    defaults.mode
+  
   match mode with
   | Config.GenerationMode.Iterative =>
     -- In iterative mode, always use 1 sample
     return 1
   | Config.GenerationMode.Parallel =>
-    -- In parallel mode, use configured samples
-    let apiDefaultSamples := match api.kind with
-    | APIKind.Ollama => defaultOllamaSamples
-    | _ => defaultSamples
-
+    -- In parallel mode, use configured samples or defaults
     match ← Config.getNumSamples with
-    | none | some 0 => return apiDefaultSamples
+    | none | some 0 => return defaults.numSamples
     | some n => return n
 
-def getMaxTokens : CoreM Nat := do
+def getMaxTokens (api : API) (tacticKind : TacticKind) : CoreM Nat := do
+  let defaults := Config.getDefaultsForAPI api.kind tacticKind
   match ← Config.getMaxTokens with
-  | none | some 0 => return defaultMaxTokens
+  | none | some 0 => return defaults.maxTokens
   | some n => return n
 
-def getChatGenerationOptions (api : API): CoreM ChatGenerationOptions := do
-  let numSamples ← getNumSamples api
-  let maxTokens ← getMaxTokens
+/-- Print configuration details in verbose mode -/
+def printConfiguration (api : API) (tacticKind : TacticKind) (numSamples : Nat) (maxTokens : Nat) : CoreM Unit := do
+  if ← Config.getVerbose then
+    let mode ← Config.getModeEnum
+    Config.verbosePrint s!"LLMlean Configuration:"
+    Config.verbosePrint s!"  Tactic: {repr tacticKind}"
+    Config.verbosePrint s!"  API: {repr api.kind}"
+    Config.verbosePrint s!"  Model: {api.model}"
+    Config.verbosePrint s!"  Endpoint: {api.baseUrl}"
+    Config.verbosePrint s!"  Prompt Kind: {repr api.promptKind}"
+    Config.verbosePrint s!"  Response Format: {repr api.responseFormat}"
+    Config.verbosePrint s!"  Mode: {repr mode}"
+    Config.verbosePrint s!"  Number of Samples: {numSamples}"
+    Config.verbosePrint s!"  Max Tokens: {maxTokens}"
+
+def getChatGenerationOptions (api : API) (tacticKind : TacticKind): CoreM ChatGenerationOptions := do
+  let numSamples ← getNumSamples api tacticKind
+  let maxTokens ← getMaxTokens api tacticKind
+  -- Print configuration in verbose mode
+  printConfiguration api tacticKind numSamples maxTokens
   return {
     numSamples := numSamples,
     temperature := defaultTemperature,
@@ -251,9 +238,11 @@ def getChatGenerationOptions (api : API): CoreM ChatGenerationOptions := do
     stopSequences := defaultStopTactic
   }
 
-def getChatGenerationOptionsQed (api : API) : CoreM ChatGenerationOptionsQed := do
-  let numSamples ← getNumSamples api
-  let maxTokens ← getMaxTokens
+def getChatGenerationOptionsQed (api : API) (tacticKind : TacticKind) : CoreM ChatGenerationOptionsQed := do
+  let numSamples ← getNumSamples api tacticKind
+  let maxTokens ← getMaxTokens api tacticKind
+  -- Print configuration in verbose mode
+  printConfiguration api tacticKind numSamples maxTokens
   return {
     numSamples := numSamples
     temperature := defaultTemperature,
