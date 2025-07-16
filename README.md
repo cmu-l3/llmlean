@@ -125,9 +125,11 @@ Please see the following:
 
 
 ## Testing
-Rebuild LLMLean with the config `test=on`:
+Tests are under the `LLMleanTest` subdirectory.
+Make sure the versions are the same between `lakefile.lean` and `lean-toolchain` in the root directory and the `LLMleanTest` directory, and then run:
 ```sh
-lake -R -Ktest=on update
+cd LLMleanTest
+lake update
 lake build
 ```
-Then manually check `llmlean` on the files under `LLMleanTest`.
+Then manually try running `llmqed`/`llmstep` on the files under `LLMleanTest`.
