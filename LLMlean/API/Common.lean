@@ -270,4 +270,100 @@ def getMarkdownLeanCodeBlocks (markdown : String) : List String := Id.run do
       blocks := blocks ++ [part.headD ""]
   return blocks
 
+
+/--
+Parses a proof out of a response from the LLM.
+The proof is expected to be enclosed in `[PROOF]...[/PROOF]` tags.
+-/
+def splitProof (text : String) : String :=
+  let text := ((text.splitOn "[PROOF]").tailD [text]).headD text
+  match (text.splitOn "[/PROOF]").head? with
+  | some s => s.trim
+  | none => text.trim
+
+def generateOpenAI (prompts : List String)
+(api : API) (options : ChatGenerationOptions) : IO $ Array (String × Float) := do
+  let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
+  for prompt in prompts do
+    let req : OpenAIGenerationRequest := {
+      model := api.model,
+      messages := [
+        {
+          role := "user",
+          content := prompt
+        }
+      ],
+      n := options.numSamples,
+      temperature := options.temperature,
+      max_tokens := options.maxTokens,
+      stop := options.stopSequences
+    }
+    let res : OpenAIResponse ← post req api.baseUrl api.key
+    for result in res.choices do
+      results := results.insert result.message.content
+
+  let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
+  return finalResults
+
+def generateAnthropic (prompts : List String)
+(api : API) (options : ChatGenerationOptions) : IO $ Array (String × Float) := do
+  let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
+  for prompt in prompts do
+    for i in List.range options.numSamples do
+      let temperature := if i == 1 then 0.0 else options.temperature
+      let req : AnthropicGenerationRequest := {
+        model := api.model,
+        messages := [
+          {
+            role := "user",
+            content := prompt
+          }
+        ],
+        temperature := temperature,
+        max_tokens := options.maxTokens,
+        stop_sequences := options.stopSequences
+      }
+      let res : AnthropicResponse ← post req api.baseUrl api.key
+      for result in res.content do
+        results := results.insert result.text
+
+  let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
+  return finalResults
+
+def generateOllama (prompts : List String)
+(api : API) (options : ChatGenerationOptions) : IO $ Array (String × Float) := do
+  let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
+  for prompt in prompts do
+    for i in List.range options.numSamples do
+      let temperature := if i == 1 then 0.0 else options.temperature
+      let req : OllamaGenerationRequest := {
+        model := api.model,
+        prompt := prompt,
+        stream := false,
+        options := {
+          temperature := temperature,
+          stop := options.stopSequences,
+          num_predict := options.maxTokens
+        }
+      }
+      let res : OllamaResponse ← post req api.baseUrl api.key
+      results := results.insert res.response
+
+  return results.toArray.map (fun x => (x, 1.0))
+
+/-!
+## Main Handler
+-/
+def Config.API.generate
+  (api : API) (prompts : List String) (options : ChatGenerationOptions): CoreM $ Array (String × Float) := do
+  match api.kind with
+    | APIKind.Ollama =>
+      generateOllama prompts api options
+    | APIKind.TogetherAI =>
+      generateOpenAI prompts api options
+    | APIKind.OpenAI =>
+      generateOpenAI prompts api options
+    | APIKind.Anthropic =>
+      generateAnthropic prompts api options
+
 end LLMlean

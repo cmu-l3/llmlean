@@ -6,108 +6,17 @@ open Lean LLMlean.Config
 
 namespace LLMlean
 
+open API
+
 /--
-Parses a proof out of a response from the LLM.
-The proof is expected to be enclosed in `[PROOF]...[/PROOF]` tags.
+Generates proof completions using the LLM API.
 -/
-def splitProof (text : String) : String :=
-  let text := ((text.splitOn "[PROOF]").tailD [text]).headD text
-  match (text.splitOn "[/PROOF]").head? with
-  | some s => s.trim
-  | none => text.trim
-
-/-!
-## OpenAI
--/
-def parseResponseQedOpenAI (res: OpenAIResponse) : Array String :=
-  (res.choices.map fun x => (splitProof x.message.content)).toArray
-
-def qedOpenAI (prompts : List String)
-(api : API) (options : ChatGenerationOptionsQed) : IO $ Array (String × Float) := do
-  let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
-  for prompt in prompts do
-    let req : OpenAIGenerationRequest := {
-      model := api.model,
-      messages := [
-        {
-          role := "user",
-          content := prompt
-        }
-      ],
-      n := options.numSamples,
-      temperature := options.temperature,
-      max_tokens := options.maxTokens,
-      stop := options.stopSequences
-    }
-    let res : OpenAIResponse ← post req api.baseUrl api.key
-    for result in (parseResponseQedOpenAI res) do
-      results := results.insert result
-
-  let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
-  return finalResults
-
-/-!
-## Anthropic
--/
-def parseResponseQedAnthropic (res: AnthropicResponse) : Array String :=
-  (res.content.map fun x => (splitProof x.text)).toArray
-
-def qedAnthropic (prompts : List String)
-(api : API) (options : ChatGenerationOptionsQed) : IO $ Array (String × Float) := do
-  let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
-  for prompt in prompts do
-    for i in List.range options.numSamples do
-      let temperature := if i == 1 then 0.0 else options.temperature
-      let req : AnthropicGenerationRequest := {
-        model := api.model,
-        messages := [
-          {
-            role := "user",
-            content := prompt
-          }
-        ],
-        temperature := temperature,
-        max_tokens := options.maxTokens,
-        stop_sequences := options.stopSequences
-      }
-      let res : AnthropicResponse ← post req api.baseUrl api.key
-      for result in (parseResponseQedAnthropic res) do
-        results := results.insert result
-
-  let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
-  return finalResults
-
-/-!
-## Ollama
--/
-def parseResponseQedOllama (res: OllamaResponse) : String :=
-  splitProof res.response
-
-def qedOllama (prompts : List String)
-(api : API) (options : ChatGenerationOptionsQed) : IO $ Array (String × Float) := do
-  let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
-  for prompt in prompts do
-    for i in List.range options.numSamples do
-      let temperature := if i == 1 then 0.0 else options.temperature
-      let req : OllamaGenerationRequest := {
-        model := api.model,
-        prompt := prompt,
-        stream := false,
-        options := {
-          temperature := temperature,
-          stop := options.stopSequences,
-          num_predict := options.maxTokens
-        }
-      }
-      let res : OllamaResponse ← post req api.baseUrl api.key
-      results := results.insert (parseResponseQedOllama res)
-
-  let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
-  return finalResults
-
-/-!
-## Ollama with markdown output (e.g., Kimina Prover)
--/
+def LLMlean.Config.API.proofCompletion
+  (api : API) (tacticState : String) (context : String) : CoreM $ Array (String × Float) := do
+  let prompts := makeQedPrompts api.promptKind context tacticState
+  let options ← getChatGenerationOptions api TacticKind.LLMQed
+  let responses := (← generate api prompts options).map (fun (x, p) => (splitProof x, p))
+  return responses.filter (fun (x, _) => filterGeneration x)
 
 /--
 Extracts proof from markdown response by finding the last code block
@@ -138,80 +47,6 @@ def extractProofFromMarkdownResponse (context : String) (response : String) : Op
   -- If we can't find the context, return the whole block
   some lastBlock.trim
 
-def qedOllamaMarkdown (prompts : List String) (context : String)
-(api : API) (options : ChatGenerationOptionsQed) : IO $ Array (String × Float) := do
-  let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
-  for prompt in prompts do
-    for i in List.range options.numSamples do
-      let temperature := if i == 1 then 0.0 else options.temperature
-      let req : OllamaGenerationRequest := {
-        model := api.model,
-        prompt := prompt,
-        stream := false,
-        options := {
-          temperature := temperature,
-          stop := options.stopSequences,
-          num_predict := options.maxTokens
-        }
-      }
-      let res : OllamaResponse ← post req api.baseUrl api.key
-      match extractProofFromMarkdownResponse context res.response with
-      | some proof => results := results.insert proof
-      | none => results := results
-
-  let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
-  return finalResults
-
-/-!
-## Ollama with tactic output (e.g., BFS-Prover)
--/
-def qedOllamaTactic (prompts : List String)
-(api : API) (options : ChatGenerationOptionsQed) : IO $ Array (String × Float) := do
-  let mut results : Std.HashSet String := Std.HashSet.emptyWithCapacity
-  for prompt in prompts do
-    for i in List.range options.numSamples do
-      let temperature := if i == 1 then 0.0 else options.temperature
-      let req : OllamaGenerationRequest := {
-        model := api.model,
-        prompt := prompt,
-        stream := false,
-        options := {
-          temperature := temperature,
-          num_predict := options.maxTokens,
-          stop := options.stopSequences
-        }
-      }
-      let res : OllamaResponse ← post req api.baseUrl api.key
-      let tactic := res.response
-      results := results.insert tactic
-
-  let finalResults := (results.toArray.filter filterGeneration).map fun x => (x, 1.0)
-  return finalResults
-
-/-!
-## Main Handler
--/
-
-/--
-Generates proof completions using the LLM API.
--/
-def LLMlean.Config.API.proofCompletion
-  (api : API) (tacticState : String) (context : String) : CoreM $ Array (String × Float) := do
-  let prompts := makeQedPrompts api.promptKind context tacticState
-  let options ← getChatGenerationOptionsQed api TacticKind.LLMQed
-  match api.kind with
-    | APIKind.Ollama =>
-      match api.responseFormat with
-      | ResponseFormat.Markdown =>
-        qedOllamaMarkdown prompts context api options
-      | _ =>
-        qedOllama prompts api options
-    | APIKind.TogetherAI =>
-      qedOpenAI prompts api options
-    | APIKind.OpenAI =>
-      qedOpenAI prompts api options
-    | APIKind.Anthropic =>
-      qedAnthropic prompts api options
 
 /--
 Generates proof completions with refinement context using the LLM API.
@@ -220,19 +55,12 @@ def LLMlean.Config.API.proofCompletionRefinement
   (api : API) (tacticState : String) (context : String)
   (previousAttempt : String) (errorMsg : String) : CoreM $ Array (String × Float) := do
   let prompts := makeQedRefinementPrompts api.promptKind context tacticState previousAttempt errorMsg
-  let options ← getChatGenerationOptionsQed api TacticKind.LLMQed
-  match api.kind with
-    | APIKind.Ollama =>
-      match api.responseFormat with
-      | ResponseFormat.Markdown =>
-        qedOllamaMarkdown prompts context api options
-      | _ =>
-        qedOllama prompts api options
-    | APIKind.TogetherAI =>
-      qedOpenAI prompts api options
-    | APIKind.OpenAI =>
-      qedOpenAI prompts api options
-    | APIKind.Anthropic =>
-      qedAnthropic prompts api options
+  let options ← getChatGenerationOptions api TacticKind.LLMQed
+  let responses ← generate api prompts options
+  return Std.HashMap.toArray (responses.foldl (fun results (response, prob) =>
+    match extractProofFromMarkdownResponse context response with
+      | some proof => results.insert proof prob
+      | none => results
+  ) {})
 
 end LLMlean
