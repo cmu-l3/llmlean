@@ -50,13 +50,6 @@ structure ChatGenerationOptions where
   numSamples : Nat := defaultSamples
 deriving ToJson, FromJson
 
-structure ChatGenerationOptionsQed where
-  temperature : Float := defaultTemperature
-  maxTokens : Nat := defaultMaxTokens
-  stopSequences : List String := defaultStopProof
-  numSamples : Nat := defaultSamples
-deriving ToJson, FromJson
-
 structure OpenAIMessage where
   role : String
   content : String
@@ -238,18 +231,6 @@ def getChatGenerationOptions (api : API) (tacticKind : TacticKind): CoreM ChatGe
     temperature := defaultTemperature,
     maxTokens := maxTokens,
     stopSequences := defaultStopTactic
-  }
-
-def getChatGenerationOptionsQed (api : API) (tacticKind : TacticKind) : CoreM ChatGenerationOptionsQed := do
-  let numSamples ← getNumSamples api tacticKind
-  let maxTokens ← getMaxTokens api tacticKind
-  -- Print configuration in verbose mode
-  printConfiguration api tacticKind numSamples maxTokens
-  return {
-    numSamples := numSamples
-    temperature := defaultTemperature,
-    maxTokens := maxTokens,
-    stopSequences := defaultStopProof
   }
 
 /--
