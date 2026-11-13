@@ -28,6 +28,13 @@
 </p>
 
 <p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="img/usage-dark.svg">
+    <img src="img/usage.svg" alt="Invoke llmqed on the Cauchy–Schwarz inequality, then receive a proof suggestion checked by Lean to close all goals. Click Try this to insert it." width="900">
+  </picture>
+</p>
+
+<p align="center">
   You can use an LLM running on your laptop or in the cloud.
 </p>
 

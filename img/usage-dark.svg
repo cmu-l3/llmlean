@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="346" viewBox="0 0 1120 346" role="img" aria-labelledby="title desc">
+  <title id="title">Invoke an LLM-powered tactic and receive verified suggestions</title>
+  <desc id="desc">Call llmqed on the two-dimensional Cauchy–Schwarz inequality. In Lean's Infoview, LLMLean suggests nlinarith [sq_nonneg (a * d - b * c)]. Lean checks that this proof closes all goals. Click Try this to insert the proof.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 12 12" refX="9" refY="6" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="m3 2 4 4-4 4" fill="none" stroke="#829aa9" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+  <g font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+    <circle cx="38" cy="28" r="14" fill="#20344f"/>
+    <text x="38" y="33" text-anchor="middle" font-size="15" font-weight="650" fill="#79b8ff">1</text>
+    <text x="62" y="35" font-size="21" font-weight="600" fill="#f0f6fc">Invoke an LLM-powered tactic</text>
+    <circle cx="630" cy="28" r="14" fill="#17352b"/>
+    <text x="630" y="33" text-anchor="middle" font-size="15" font-weight="650" fill="#7ee2a8">2</text>
+    <text x="654" y="35" font-size="21" font-weight="600" fill="#f0f6fc">Receive verified suggestions</text>
+
+    <!-- Lean source, with syntax coloring and a highlighted tactic invocation. -->
+    <rect x="24" y="62" width="500" height="260" rx="14" fill="#151e2b" stroke="#344459" stroke-width="1.5"/>
+    <text x="46" y="89" font-size="15" fill="#a6b8cd">Cauchy–Schwarz in two dimensions</text>
+    <path d="M24 105h500" stroke="#344459"/>
+    <g font-family="'SFMono-Regular', Consolas, 'Liberation Mono', monospace" font-size="18" fill="#f0f6fc">
+      <text x="46" y="140" xml:space="preserve"><tspan fill="#79b8ff">example</tspan> (a b c d : <tspan fill="#d2a8ff">ℝ</tspan>) :</text>
+      <text x="46" y="172" xml:space="preserve">  (a * c + b * d) ^ <tspan fill="#a5d6a7">2</tspan> ≤</text>
+      <text x="46" y="204" xml:space="preserve">    (a ^ <tspan fill="#a5d6a7">2</tspan> + b ^ <tspan fill="#a5d6a7">2</tspan>) *</text>
+      <text x="46" y="236" xml:space="preserve">    (c ^ <tspan fill="#a5d6a7">2</tspan> + d ^ <tspan fill="#a5d6a7">2</tspan>) := <tspan fill="#79b8ff">by</tspan></text>
+      <rect x="61" y="253" width="82" height="32" rx="5" fill="#203c5b"/>
+      <text x="46" y="276" xml:space="preserve">  <tspan fill="#79b8ff" font-weight="600">llmqed</tspan></text>
+    </g>
+
+    <path d="M544 192h52" fill="none" stroke="#829aa9" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <!-- A diagram of the checked suggestion, not an editor error state. -->
+    <rect x="616" y="62" width="480" height="260" rx="14" fill="#151e2b" stroke="#344459" stroke-width="1.5"/>
+    <text x="638" y="89" font-size="15" fill="#a6b8cd">Lean Infoview</text>
+    <path d="M616 105h480" stroke="#344459"/>
+    <text x="638" y="140" font-size="18" font-weight="600" fill="#f0f6fc">Try this:</text>
+    <rect x="638" y="160" width="436" height="62" rx="8" fill="#101822"/>
+    <text x="654" y="198" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', monospace" font-size="17" fill="#f0f6fc" xml:space="preserve"><tspan fill="#79b8ff">nlinarith</tspan> [sq_nonneg (a * d - b * c)]</text>
+    <path d="m640 251 6 6 11-13" fill="none" stroke="#7ee2a8" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="668" y="257" font-size="18" font-weight="600" fill="#7ee2a8">Closes all goals</text>
+    <text x="638" y="294" font-size="16" fill="#a6b8cd">Click Try this to insert the proof.</text>
+  </g>
+</svg>
