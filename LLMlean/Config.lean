@@ -24,6 +24,9 @@ register_option llmlean.attempts : Nat := {
 register_option llmlean.maxOutputTokens : Nat := {
   defValue := 4096, descr := "Maximum output tokens per request, including reasoning."
 }
+register_option llmlean.reasoningEffort : String := {
+  defValue := "default", descr := "Reasoning effort: default, none, minimal, low, medium, high, or xhigh. Support depends on the model/server."
+}
 register_option llmlean.timeoutSeconds : Nat := {
   defValue := 90, descr := "Wall-clock budget for an invocation."
 }
@@ -40,6 +43,7 @@ structure Overrides where
   baseUrl : Option String := none
   attempts : Option Nat := none
   maxOutputTokens : Option Nat := none
+  reasoningEffort : Option String := none
   timeoutSeconds : Option Nat := none
   verbose : Option Bool := none
   deriving Inhabited, Repr
@@ -52,6 +56,7 @@ structure Settings where
   apiKeyEnv : String := "LLMLEAN_API_KEY"
   attempts : Nat := 3
   maxOutputTokens : Nat := 4096
+  reasoningEffort : String := "default"
   timeoutSeconds : Nat := 90
   verbose : Bool := false
   deriving Inhabited, Repr
@@ -64,6 +69,7 @@ private def pick (high low : Overrides) : Overrides := {
   baseUrl := high.baseUrl.or low.baseUrl
   attempts := high.attempts.or low.attempts
   maxOutputTokens := high.maxOutputTokens.or low.maxOutputTokens
+  reasoningEffort := high.reasoningEffort.or low.reasoningEffort
   timeoutSeconds := high.timeoutSeconds.or low.timeoutSeconds
   verbose := high.verbose.or low.verbose
 }
@@ -74,6 +80,7 @@ def fromOptions (opts : Options) : Overrides := {
   baseUrl := opts.get? `llmlean.baseUrl
   attempts := opts.get? `llmlean.attempts
   maxOutputTokens := opts.get? `llmlean.maxOutputTokens
+  reasoningEffort := opts.get? `llmlean.reasoningEffort
   timeoutSeconds := opts.get? `llmlean.timeoutSeconds
   verbose := opts.get? `llmlean.verbose
 }
@@ -105,17 +112,20 @@ def resolve (file env : Overrides := {}) (opts : Options := {}) : Except String 
     provider, model, baseUrl, apiKeyEnv := keyEnv
     attempts := o.attempts.getD 3
     maxOutputTokens := o.maxOutputTokens.getD 4096
+    reasoningEffort := o.reasoningEffort.getD "default"
     timeoutSeconds := o.timeoutSeconds.getD 90
     verbose := o.verbose.getD false
   }
   if settings.attempts == 0 then throw "attempts must be a positive integer"
   if settings.maxOutputTokens == 0 then throw "max_output_tokens must be a positive integer"
   if settings.timeoutSeconds == 0 then throw "timeout_seconds must be a positive integer"
+  unless #["default", "none", "minimal", "low", "medium", "high", "xhigh"].contains settings.reasoningEffort do
+    throw "reasoning_effort must be default, none, minimal, low, medium, high, or xhigh"
   return settings
 
 open Lake Toml in
 def decodeTable (table : Table) : Except String Overrides := do
-  let known := #[`provider, `model, `base_url, `attempts, `max_output_tokens, `timeout_seconds, `verbose]
+  let known := #[`provider, `model, `base_url, `attempts, `max_output_tokens, `reasoning_effort, `timeout_seconds, `verbose]
   for (key, _) in table.items do
     unless known.contains key do
       throw s!"Unsupported configuration key '{key}'. LLMLean now uses provider/model/base_url and Responses. See docs/migration.md."
@@ -126,6 +136,7 @@ def decodeTable (table : Table) : Except String Overrides := do
       baseUrl := ← table.decode? `base_url
       attempts := ← table.decode? `attempts
       maxOutputTokens := ← table.decode? `max_output_tokens
+      reasoningEffort := ← table.decode? `reasoning_effort
       timeoutSeconds := ← table.decode? `timeout_seconds
       verbose := ← table.decode? `verbose
     }
@@ -182,6 +193,7 @@ def loadEnv : IO Overrides := do
     baseUrl := ← IO.getEnv "LLMLEAN_BASE_URL"
     attempts := ← envNat "LLMLEAN_ATTEMPTS"
     maxOutputTokens := ← envNat "LLMLEAN_MAX_OUTPUT_TOKENS"
+    reasoningEffort := ← IO.getEnv "LLMLEAN_REASONING_EFFORT"
     timeoutSeconds := ← envNat "LLMLEAN_TIMEOUT_SECONDS"
     verbose
   }

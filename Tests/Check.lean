@@ -19,6 +19,8 @@ macro "hidden_admission" : tactic => `(tactic| exact sorry)
 
 example (n : Nat) : n = n := by
   expect_check "rfl" => complete
+  expect_check "example (n : Nat) : n = n := by\n  rfl" => invalid
+  expect_check "by\n  rfl" => invalid
   expect_check "exact does_not_exist" => invalid
   expect_check "sorry" => invalid
   expect_check "hidden_admission" => invalid
@@ -59,6 +61,26 @@ elab "test_refinement" : tactic => do
 example : True ∧ True := by
   test_refinement
   exact ⟨True.intro, True.intro⟩
+
+elab "test_declaration_repair" : tactic => do
+  let count ← IO.mkRef (0 : Nat)
+  let generator : Generator := fun _ _ input _ => do
+    let n ← count.get
+    count.set (n + 1)
+    if n == 0 then
+      return "```lean\nexample (n : Nat) : n + 0 = n := by\n  rfl\n```"
+    unless (input.splitOn "inside the existing 'by' proof").length > 1 do
+      throw <| IO.userError "Repair must explain that only tactics belong in the existing proof."
+    return "```lean\nrfl\n```"
+  let before ← prettyGoals
+  let result ← generateChecked {} .proof "example (n : Nat) : n + 0 = n := by" "" generator
+  unless result.code == "rfl" && result.result == .complete && (← count.get) == 2 do
+    throwError "Expected a whole declaration to be rejected and repaired to tactics."
+  unless (← prettyGoals) == before do throwError "Repair changed the original state."
+
+example (n : Nat) : n + 0 = n := by
+  test_declaration_repair
+  rfl
 
 elab "test_step" : tactic => do
   let count ← IO.mkRef (0 : Nat)

@@ -51,7 +51,7 @@ def generateChecked (settings : Config.Settings) (task : TaskKind) (context : St
       if task == .step then return { code := candidate.toOption.getD "", result }
       diagnostic := s!"The proof is incomplete. Remaining goals:\n{goals}"
     | .invalid error => diagnostic := error
-    history := history ++ s!"\n\nPrevious attempt:\n{text}\n\nLean feedback:\n{diagnostic}\nProvide a corrected replacement for the original goals."
+    history := history ++ s!"\n\nPrevious attempt:\n{text}\n\nLean feedback:\n{diagnostic}\nProvide a corrected tactic sequence for the original goals in one lean code block. Replace only the tactic hole inside the existing proof; do not repeat the declaration."
   throwError "No checked suggestion after {settings.attempts} attempts.\n{diagnostic}"
 
 def suggest (ref : Syntax) (task : TaskKind) (pfx : String := "") : TacticM Unit := do

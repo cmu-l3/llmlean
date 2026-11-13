@@ -11,6 +11,7 @@ types are errors. Numbers and booleans are ordinary TOML values, not quoted stri
 | `attempts` | `3` | `LLMLEAN_ATTEMPTS` | `llmlean.attempts` |
 | `timeout_seconds` | `90` | `LLMLEAN_TIMEOUT_SECONDS` | `llmlean.timeoutSeconds` |
 | `max_output_tokens` | `4096` | `LLMLEAN_MAX_OUTPUT_TOKENS` | `llmlean.maxOutputTokens` |
+| `reasoning_effort` | `"default"` | `LLMLEAN_REASONING_EFFORT` | `llmlean.reasoningEffort` |
 | `verbose` | `false` | `LLMLEAN_VERBOSE` | `llmlean.verbose` |
 
 Precedence: explicitly set Lean options > environment > file > defaults. An explicit `false`
@@ -27,6 +28,12 @@ the generation loop; individual requests receive the remaining budget. Candidate
 also has a 200,000-heartbeat limit. Heartbeats are cooperative, so they are not a hard wall-clock
 timeout for arbitrary metaprograms. `max_output_tokens` includes reasoning tokens. Truncated
 responses produce an error instead of presenting an incomplete fragment as a suggestion.
+
+`reasoning_effort = "none"` requests thinking off, for example with Qwen3.5 in LM Studio.
+`"default"` omits the API setting and lets the server choose. Explicit values are sent as
+`reasoning.effort`; accepted values are `none`, `minimal`, `low`, `medium`, `high`, and `xhigh`,
+but support depends on the server and model. A server may reject an unsupported value.
+This controls individual LLMLean requests without changing the model's settings in its UI.
 
 Configuration paths:
 

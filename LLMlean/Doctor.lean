@@ -10,6 +10,7 @@ public def main (args : List String) : IO UInt32 := do
   try
     let settings ← Config.load
     IO.println s!"Provider: {settings.provider}\nModel: {settings.model}\nResponses: {settings.responsesUrl}"
+    IO.println s!"Reasoning effort: {settings.reasoningEffort}"
     IO.println s!"Budget: {settings.attempts} attempts, {settings.timeoutSeconds}s, {settings.maxOutputTokens} output tokens/request"
     if args.contains "--offline" then return 0
     let key ← settings.apiKey

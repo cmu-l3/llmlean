@@ -9,14 +9,15 @@ namespace LLMlean.Responses
 
 /-- Deliberately stateless: the same request works with Ollama, OpenRouter, and OpenAI. -/
 def request (settings : Config.Settings) (instructions input : String) : Json :=
-  Json.mkObj [
+  Json.mkObj <| [
     ("model", toJson settings.model),
     ("instructions", toJson instructions),
     ("input", toJson input),
     ("max_output_tokens", toJson settings.maxOutputTokens),
     ("store", toJson false),
     ("stream", toJson false)
-  ]
+  ] ++ if settings.reasoningEffort == "default" then [] else
+    [("reasoning", Json.mkObj [("effort", toJson settings.reasoningEffort)])]
 
 private def errorMessage (json : Json) : Option String :=
   ((json.getObjVal? "error").toOption.bind fun e => (e.getObjValAs? String "message").toOption)

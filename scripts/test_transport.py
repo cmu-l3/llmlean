@@ -47,7 +47,11 @@ class Handler(BaseHTTPRequestHandler):
         assert self.path == "/v1/responses", self.path
         request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         REQUESTS.append((request, self.headers.get("Authorization")))
-        assert set(request) == {"model", "instructions", "input", "max_output_tokens", "store", "stream"}
+        fields = {"model", "instructions", "input", "max_output_tokens", "store", "stream"}
+        if "reasoning" in request:
+            fields.add("reasoning")
+            assert request["reasoning"] == {"effort": "none"}
+        assert set(request) == fields
         assert request["store"] is False and request["stream"] is False
         model = request["model"]
         if model == "stub-auth-error":
@@ -118,9 +122,20 @@ example : True ∧ True := by
                 calls = REQUESTS[start:]
                 assert len(calls) == 4, calls
                 assert all(auth == 'Bearer test-key-"with\\quotes' for _, auth in calls)
+                assert all("reasoning" not in body for body, _ in calls)
+
+            # An explicit reasoning override must reach every request, including repairs.
+            start = len(REQUESTS)
+            run(["lake", "env", "lean", str(source)],
+                dict(env, LLMLEAN_REASONING_EFFORT="none"), contains="Try this:")
+            calls = REQUESTS[start:]
+            assert len(calls) == 4, calls
+            assert all(body.get("reasoning") == {"effort": "none"} for body, _ in calls)
 
             doctor = [str(ROOT / ".lake/build/bin/llmlean"), "doctor"]
             run(doctor, env, contains="model available")
+            run(doctor + ["--offline"], dict(env, LLMLEAN_REASONING_EFFORT="none"),
+                contains="Reasoning effort: none")
             run(doctor, dict(env, LLMLEAN_MODEL="missing"), expected=1, contains="ollama pull missing")
             run(doctor, dict(env, LLMLEAN_PROVIDER="openai"), expected=1, contains="OPENAI_API_KEY")
             run(doctor + ["--offline"], dict(env, LLMLEAN_CONFIG=str(folder / "missing.toml")),
