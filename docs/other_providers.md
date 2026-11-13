@@ -1,5 +1,8 @@
 # Providers
 
+OpenAI with `gpt-6-luna` is the default. Set `OPENAI_API_KEY` in your editor's environment;
+no configuration file is needed for this setup. Select `provider = "local"` to use a local server.
+
 All connections use `POST <base_url>/responses` with stateless requests. LLMLean supplies the
 original goals, source context, and repair feedback on each call. It does not depend on stored
 conversations or `previous_response_id`. The HTTP implementation and proof checker are shared.

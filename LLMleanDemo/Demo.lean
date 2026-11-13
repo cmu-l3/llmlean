@@ -31,7 +31,7 @@ example (n : Nat) : n = n := by
 
 -- 1. A first suggestion. Replace `sorry` with: llmstep
 example (n : Nat) : n + 0 = n := by
-  sorry
+  rfl
 
 -- 2. Guide the response. Replace `sorry` with: llmstep "exact "
 example (P Q : Prop) (hp : P) (hpq : P → Q) : Q := by
@@ -49,4 +49,4 @@ example (P Q R : Prop) (hp : P) (hq : Q) (hr : R) : P ∧ Q ∧ R := by
 -- 5. A list theorem. Replace `sorry` with: llmqed
 example (α : Type) (xs ys : List α) :
     (xs ++ ys).length = xs.length + ys.length := by
-  sorry
+  simp

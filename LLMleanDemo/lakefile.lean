@@ -8,4 +8,4 @@ require llmlean from ".."
 
 @[default_target]
 lean_lib Demo where
-  roots := #[`Demo, `Solutions]
+  roots := #[`Demo, `Solutions, `Context]

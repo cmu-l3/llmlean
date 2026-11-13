@@ -54,6 +54,12 @@ class Handler(BaseHTTPRequestHandler):
         assert set(request) == fields
         assert request["store"] is False and request["stream"] is False
         model = request["model"]
+        if model == "stub-import":
+            assert "theorem ContextExample.ListTools.length_append_one" in request["input"]
+            assert "TARGET_AFTER_HOLE" not in request["input"]
+            return self.reply(200, completion("```lean\nexact ContextExample.ListTools.length_append_one xs x\n```"))
+        if model == "stub-context":
+            return self.reply(200, completion("```lean\nsimpa only [ContextBench.pushTwice_eq, ContextExample.ListTools.length_append_one] using hlen\n```"))
         if model == "stub-auth-error":
             return self.reply(401, {"error": {"message": "test authentication error"}})
         if model == "stub-truncated":
@@ -97,7 +103,7 @@ def main():
             # Never forward real credentials or the developer's LLMLean configuration.
             env = {k: v for k, v in os.environ.items()
                    if not k.startswith("LLMLEAN_") and k not in {"OPENAI_API_KEY", "OPENROUTER_API_KEY"}}
-            env.update(LLMLEAN_CONFIG=str(config), LLMLEAN_MODEL="stub-model")
+            env.update(LLMLEAN_CONFIG=str(config), LLMLEAN_PROVIDER="local", LLMLEAN_MODEL="stub-model")
             source = folder / "Example.lean"
             source.write_text('''module
 import LLMlean
@@ -111,6 +117,17 @@ example : True ∧ True := by
   llmqed
   exact ⟨True.intro, True.intro⟩
 ''')
+            # With no provider/model override, OpenAI's default model must reach the wire.
+            default_env = {k: v for k, v in env.items()
+                           if k not in {"LLMLEAN_PROVIDER", "LLMLEAN_MODEL"}}
+            default_env["OPENAI_API_KEY"] = "test-default-key"
+            start = len(REQUESTS)
+            run(["lake", "env", "lean", str(source)], default_env, contains="Try this:")
+            calls = REQUESTS[start:]
+            assert len(calls) == 4, calls
+            assert all(body["model"] == "gpt-6-luna" and auth == "Bearer test-default-key"
+                       for body, auth in calls)
+
             # All three presets must take the identical transport and proof-checking path.
             for provider, key_name in [("local", "LLMLEAN_API_KEY"),
                                        ("openai", "OPENAI_API_KEY"),
@@ -132,12 +149,37 @@ example : True ∧ True := by
             assert len(calls) == 4, calls
             assert all(body.get("reasoning") == {"effort": "none"} for body, _ in calls)
 
+            # Imported project statements must reach the actual transport, with no future source.
+            source.write_text('''module
+import LLMlean
+import Tests.ContextBridge
+example {α : Type} (xs : List α) (x : α) : (xs ++ [x]).length = xs.length + 1 := by
+  llmqed
+  -- TARGET_AFTER_HOLE
+  exact ContextExample.ListTools.length_append_one xs x
+''')
+            run(["lake", "env", "lean", str(source)], dict(env, LLMLEAN_MODEL="stub-import"),
+                contains="Try this:")
+            # Exercise the benchmark's opt-in model path using the same isolated loopback server.
+            start = len(REQUESTS)
+            output = run(["python3", "scripts/benchmark_context.py", "--case", "imports_transitive", "--prove"],
+                dict(env, LLMLEAN_MODEL="stub-context"), contains='"solved": true')
+            assert len(REQUESTS) == start + 4
+            rows = [json.loads(line) for line in output.splitlines() if line.startswith('{')]
+            assert {row['mode'] for row in rows} == {'full', 'window', 'all_files', 'structured'}
+            assert len(rows) == 4 and all(row['solved'] for row in rows)
+            assert all(row['total_input_chars'] == row['input_chars'] + row['instruction_chars'] for row in rows)
+
             doctor = [str(ROOT / ".lake/build/bin/llmlean"), "doctor"]
             run(doctor, env, contains="model available")
             run(doctor + ["--offline"], dict(env, LLMLEAN_REASONING_EFFORT="none"),
                 contains="Reasoning effort: none")
             run(doctor, dict(env, LLMLEAN_MODEL="missing"), expected=1, contains="ollama pull missing")
             run(doctor, dict(env, LLMLEAN_PROVIDER="openai"), expected=1, contains="OPENAI_API_KEY")
+            missing_default_key = {k: v for k, v in default_env.items() if k != "OPENAI_API_KEY"}
+            run(doctor, missing_default_key, expected=1, contains="OPENAI_API_KEY")
+            run(doctor + ["--offline"], missing_default_key,
+                contains="Provider: openai\nModel: gpt-6-luna")
             run(doctor + ["--offline"], dict(env, LLMLEAN_CONFIG=str(folder / "missing.toml")),
                 expected=1, contains="does not exist")
 

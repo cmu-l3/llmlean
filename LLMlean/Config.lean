@@ -10,10 +10,10 @@ open Lean
 namespace LLMlean.Config
 
 register_option llmlean.provider : String := {
-  defValue := "local", descr := "Connection preset: local, openrouter, or openai."
+  defValue := "openai", descr := "Connection preset: openai (default), openrouter, or local."
 }
 register_option llmlean.model : String := {
-  defValue := "", descr := "Model identifier. Defaults to a quantized local model."
+  defValue := "", descr := "Model identifier. Defaults to gpt-6-luna for OpenAI or a quantized model for local."
 }
 register_option llmlean.baseUrl : String := {
   defValue := "", descr := "API base URL, including /v1 but excluding /responses."
@@ -34,7 +34,27 @@ register_option llmlean.verbose : Bool := {
   defValue := false, descr := "Show generation/check progress."
 }
 
-def defaultModel : String := "qwen3.5:9b-q4_K_M"
+register_option llmlean.contextMode : String := {
+  defValue := "structured", descr := "Context: structured, window, full, or all_files (prefix and imported project sources)."
+}
+register_option llmlean.historyChars : Nat := {
+  defValue := 6000, descr := "Maximum Unicode characters of source/proof history; zero disables it."
+}
+register_option llmlean.premiseChars : Nat := {
+  defValue := 16000, descr := "Maximum characters of earlier and imported declaration summaries."
+}
+register_option llmlean.notationChars : Nat := {
+  defValue := 4000, descr := "Maximum characters of notation explanations."
+}
+register_option llmlean.repairChars : Nat := {
+  defValue := 6000, descr := "Maximum characters of the latest failed attempt and feedback."
+}
+register_option llmlean.definitionChars : Nat := {
+  defValue := 1200, descr := "Maximum characters of a definition body; larger bodies are omitted."
+}
+
+def defaultModel : String := "gpt-6-luna"
+def defaultLocalModel : String := "qwen3.5:9b-q4_K_M"
 
 /-- Preserve absence, including for booleans and default-valued overrides. -/
 structure Overrides where
@@ -46,19 +66,31 @@ structure Overrides where
   reasoningEffort : Option String := none
   timeoutSeconds : Option Nat := none
   verbose : Option Bool := none
+  contextMode : Option String := none
+  historyChars : Option Nat := none
+  premiseChars : Option Nat := none
+  notationChars : Option Nat := none
+  repairChars : Option Nat := none
+  definitionChars : Option Nat := none
   deriving Inhabited, Repr
 
 /-- Secrets are excluded from printable settings. Every preset uses Responses. -/
 structure Settings where
-  provider : String := "local"
+  provider : String := "openai"
   model : String := defaultModel
-  baseUrl : String := "http://localhost:11434/v1"
-  apiKeyEnv : String := "LLMLEAN_API_KEY"
+  baseUrl : String := "https://api.openai.com/v1"
+  apiKeyEnv : String := "OPENAI_API_KEY"
   attempts : Nat := 3
   maxOutputTokens : Nat := 4096
   reasoningEffort : String := "default"
   timeoutSeconds : Nat := 90
   verbose : Bool := false
+  contextMode : String := "structured"
+  historyChars : Nat := 6000
+  premiseChars : Nat := 16000
+  notationChars : Nat := 4000
+  repairChars : Nat := 6000
+  definitionChars : Nat := 1200
   deriving Inhabited, Repr
 
 def Settings.responsesUrl (s : Settings) : String := s.baseUrl ++ "/responses"
@@ -72,6 +104,12 @@ private def pick (high low : Overrides) : Overrides := {
   reasoningEffort := high.reasoningEffort.or low.reasoningEffort
   timeoutSeconds := high.timeoutSeconds.or low.timeoutSeconds
   verbose := high.verbose.or low.verbose
+  contextMode := high.contextMode.or low.contextMode
+  historyChars := high.historyChars.or low.historyChars
+  premiseChars := high.premiseChars.or low.premiseChars
+  notationChars := high.notationChars.or low.notationChars
+  repairChars := high.repairChars.or low.repairChars
+  definitionChars := high.definitionChars.or low.definitionChars
 }
 
 def fromOptions (opts : Options) : Overrides := {
@@ -83,12 +121,18 @@ def fromOptions (opts : Options) : Overrides := {
   reasoningEffort := opts.get? `llmlean.reasoningEffort
   timeoutSeconds := opts.get? `llmlean.timeoutSeconds
   verbose := opts.get? `llmlean.verbose
+  contextMode := opts.get? `llmlean.contextMode
+  historyChars := opts.get? `llmlean.historyChars
+  premiseChars := opts.get? `llmlean.premiseChars
+  notationChars := opts.get? `llmlean.notationChars
+  repairChars := opts.get? `llmlean.repairChars
+  definitionChars := opts.get? `llmlean.definitionChars
 }
 
 /-- Explicit Lean options > environment > config file > defaults. -/
 def resolve (file env : Overrides := {}) (opts : Options := {}) : Except String Settings := do
   let o := pick (fromOptions opts) (pick env file)
-  let provider := o.provider.getD "local"
+  let provider := o.provider.getD "openai"
   let (baseUrl, keyEnv) ← match provider with
     | "local" => pure ("http://localhost:11434/v1", "LLMLEAN_API_KEY")
     | "openai" => pure ("https://api.openai.com/v1", "OPENAI_API_KEY")
@@ -97,8 +141,10 @@ def resolve (file env : Overrides := {}) (opts : Options := {}) : Except String 
   let model ← match o.model with
     | some model => pure model.trimAscii.toString
     | none =>
-      if provider == "local" then pure defaultModel
-      else throw s!"Set model for provider '{provider}'."
+      match provider with
+      | "openai" => pure defaultModel
+      | "local" => pure defaultLocalModel
+      | _ => throw s!"Set model for provider '{provider}'."
   if model.isEmpty then throw "model must not be empty"
   let baseUrl := (o.baseUrl.getD baseUrl).trimAscii.toString
   let baseUrl := (baseUrl.dropEndWhile (· == '/')).toString
@@ -115,17 +161,27 @@ def resolve (file env : Overrides := {}) (opts : Options := {}) : Except String 
     reasoningEffort := o.reasoningEffort.getD "default"
     timeoutSeconds := o.timeoutSeconds.getD 90
     verbose := o.verbose.getD false
+    contextMode := o.contextMode.getD "structured"
+    historyChars := o.historyChars.getD 6000
+    premiseChars := o.premiseChars.getD 16000
+    notationChars := o.notationChars.getD 4000
+    repairChars := o.repairChars.getD 6000
+    definitionChars := o.definitionChars.getD 1200
   }
   if settings.attempts == 0 then throw "attempts must be a positive integer"
   if settings.maxOutputTokens == 0 then throw "max_output_tokens must be a positive integer"
   if settings.timeoutSeconds == 0 then throw "timeout_seconds must be a positive integer"
   unless #["default", "none", "minimal", "low", "medium", "high", "xhigh"].contains settings.reasoningEffort do
     throw "reasoning_effort must be default, none, minimal, low, medium, high, or xhigh"
+  unless #["structured", "window", "full", "all_files"].contains settings.contextMode do
+    throw "context_mode must be structured, window, full, or all_files"
   return settings
 
 open Lake Toml in
 def decodeTable (table : Table) : Except String Overrides := do
-  let known := #[`provider, `model, `base_url, `attempts, `max_output_tokens, `reasoning_effort, `timeout_seconds, `verbose]
+  let known := #[`provider, `model, `base_url, `attempts, `max_output_tokens, `reasoning_effort,
+    `timeout_seconds, `verbose, `context_mode, `history_chars, `premise_chars, `notation_chars,
+    `repair_chars, `definition_chars]
   for (key, _) in table.items do
     unless known.contains key do
       throw s!"Unsupported configuration key '{key}'. LLMLean now uses provider/model/base_url and Responses. See docs/migration.md."
@@ -139,6 +195,12 @@ def decodeTable (table : Table) : Except String Overrides := do
       reasoningEffort := ← table.decode? `reasoning_effort
       timeoutSeconds := ← table.decode? `timeout_seconds
       verbose := ← table.decode? `verbose
+      contextMode := ← table.decode? `context_mode
+      historyChars := ← table.decode? `history_chars
+      premiseChars := ← table.decode? `premise_chars
+      notationChars := ← table.decode? `notation_chars
+      repairChars := ← table.decode? `repair_chars
+      definitionChars := ← table.decode? `definition_chars
     }
   match decode.run #[] with
   | .ok value errors =>
@@ -196,6 +258,12 @@ def loadEnv : IO Overrides := do
     reasoningEffort := ← IO.getEnv "LLMLEAN_REASONING_EFFORT"
     timeoutSeconds := ← envNat "LLMLEAN_TIMEOUT_SECONDS"
     verbose
+    contextMode := ← IO.getEnv "LLMLEAN_CONTEXT_MODE"
+    historyChars := ← envNat "LLMLEAN_HISTORY_CHARS"
+    premiseChars := ← envNat "LLMLEAN_PREMISE_CHARS"
+    notationChars := ← envNat "LLMLEAN_NOTATION_CHARS"
+    repairChars := ← envNat "LLMLEAN_REPAIR_CHARS"
+    definitionChars := ← envNat "LLMLEAN_DEFINITION_CHARS"
   }
 
 def load (opts : Options := {}) : IO Settings := do

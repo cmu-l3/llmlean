@@ -4,9 +4,12 @@ This is a breaking modernization targeting Lean and Mathlib 4.35.0. Update both 
 project's toolchain and its Mathlib dependency before updating LLMLean. The public tactics
 remain `llmstep`, `llmstep "prefix"`, and `llmqed`.
 
-Replace the old configuration with a minimal configuration, or remove it to use local defaults:
+Replace the old configuration with a minimal configuration, or remove it to use the
+default OpenAI model, `gpt-6-luna`. Set `OPENAI_API_KEY` in the editor's environment.
+To keep using a local model, select it explicitly:
 
 ```toml
+provider = "local"
 model = "qwen3.5:9b-q4_K_M"
 ```
 

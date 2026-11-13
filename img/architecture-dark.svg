@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="404" viewBox="0 0 960 404" role="img" aria-labelledby="title desc">
+  <title id="title">LLMLean: local or cloud models, checked in Lean</title>
+  <desc id="desc">LLMLean sends proof context to a cloud model through OpenAI or OpenRouter, or a local model through LM Studio or Ollama. Model suggestions return to Lean for checking.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M1 1 9 5 1 9" fill="none" stroke="#829aa9" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+  <g font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+    <!-- Proof environment -->
+    <rect x="24" y="92" width="292" height="220" rx="18" fill="#142b36" stroke="#315567" stroke-width="1.5"/>
+    <g transform="translate(48 118) scale(.13)">
+      <path d="M0 0h44v227h264v43H0Z M65 0h44v166h140v41H65Z" fill="#f0f6fc"/>
+      <path d="M129 0h6l85 71 83-71h5v207h-40V81l-48 37-51-41v70h-40Z" fill="#75a7ed"/>
+    </g>
+    <text x="102" y="144" font-size="26" font-weight="650" fill="#f0f6fc">LLMLean</text>
+    <rect x="48" y="176" width="244" height="72" rx="10" fill="#101d27" stroke="#315567"/>
+    <text x="64" y="201" font-size="15" fill="#a7bfcb">Your Lean proof</text>
+    <text x="64" y="229" font-family="'SFMono-Regular', Consolas, 'Liberation Mono', monospace" font-size="18" fill="#6ee7d3">llmstep · llmqed</text>
+    <path d="m49 278 5 5 9-10" fill="none" stroke="#6ee7d3" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="74" y="284" font-size="16" fill="#b9d8e1">Checked in Lean</text>
+
+    <!-- Each connection carries context out and suggestions back. -->
+    <g fill="none" stroke="#829aa9" stroke-width="1.8" stroke-linejoin="round" marker-start="url(#arrow)" marker-end="url(#arrow)">
+      <path d="M326 180H374V106H462"/>
+      <path d="M326 224H374V298H462"/>
+    </g>
+
+    <!-- Cloud providers -->
+    <rect x="472" y="24" width="464" height="164" rx="18" fill="#151e2b" stroke="#344459" stroke-width="1.5"/>
+    <text x="496" y="59" font-size="17" font-weight="600" fill="#b8cbe1">Cloud models</text>
+    <rect x="496" y="80" width="196" height="84" rx="12" fill="#1a2736" stroke="#344459"/>
+    <text x="514" y="114" font-size="22" font-weight="600" fill="#f0f6fc">OpenAI</text>
+    <text x="514" y="141" font-size="14" fill="#a6b8cd">Cloud API</text>
+    <rect x="708" y="80" width="204" height="84" rx="12" fill="#1a2736" stroke="#344459"/>
+    <text x="726" y="114" font-size="22" font-weight="600" fill="#f0f6fc">OpenRouter</text>
+    <text x="726" y="141" font-size="14" fill="#a6b8cd">Cloud API</text>
+
+    <!-- Local providers -->
+    <rect x="472" y="216" width="464" height="164" rx="18" fill="#112923" stroke="#305347" stroke-width="1.5"/>
+    <text x="496" y="251" font-size="17" font-weight="600" fill="#a8d5c1">Local models</text>
+    <rect x="496" y="272" width="196" height="84" rx="12" fill="#17352c" stroke="#305347"/>
+    <text x="514" y="306" font-size="22" font-weight="600" fill="#f0f6fc">LM Studio</text>
+    <text x="514" y="333" font-size="14" fill="#a0c8b6">On your machine</text>
+    <rect x="708" y="272" width="204" height="84" rx="12" fill="#17352c" stroke="#305347"/>
+    <text x="726" y="306" font-size="22" font-weight="600" fill="#f0f6fc">Ollama</text>
+    <text x="726" y="333" font-size="14" fill="#a0c8b6">On your machine</text>
+  </g>
+</svg>

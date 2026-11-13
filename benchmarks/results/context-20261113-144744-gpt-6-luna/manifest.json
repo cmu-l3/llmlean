@@ -1,0 +1,58 @@
+{
+  "started_local": "2026-11-13T14:49:01.900018-05:00",
+  "git_head": "d723779e1d32903e9ea2bc1a6790bbc1dd7981a2",
+  "working_tree_has_uncommitted_implementation": true,
+  "lean_toolchain": "leanprover/lean4:v4.35.0",
+  "provider": "openai",
+  "model": "gpt-6-luna",
+  "repeats": 1,
+  "attempts": 1,
+  "timeout_seconds": 90,
+  "max_output_tokens": 4096,
+  "reasoning_effort": "default",
+  "history_chars": 6000,
+  "premise_chars": 16000,
+  "notation_chars": 4000,
+  "repair_chars": 6000,
+  "definition_chars": 1200,
+  "mode_order": [
+    "full",
+    "window",
+    "structured"
+  ],
+  "cases": [
+    "imports_same_file",
+    "imports_direct",
+    "imports_transitive",
+    "proofs_short",
+    "proofs_medium",
+    "proofs_long",
+    "declarations_small",
+    "declarations_medium",
+    "declarations_large"
+  ],
+  "source_sha256": {
+    "LLMlean/Config.lean": "cb0e4be22d5f53b0246a462ed23966ab5f1d79c8f7a5e1a2dfedaeda2d92742c",
+    "LLMlean/Context.lean": "5899dd20249339a3591e6de3b75846c149d8ca5a8cac9eaecc3f97ff94d9b0b4",
+    "LLMlean/Check.lean": "853b8ff829f0ae6273dae9d5cf75b0b7727cd21d2371a8c1bcb88c7c0bb5d0b9",
+    "LLMlean/Generate.lean": "21dbeb6c78f816c094dbad8e9f3b0ebd6dc54c04b7fa30e96f516ca11fff1a15",
+    "LLMlean/API/Prompts.lean": "e4a5f536d46b487e04a242be12a1771da6187a4cc6af466a558a11e2f6c60e70",
+    "LLMlean/API/Responses.lean": "9cb7bcefca7f8745bee58c7fa317f0458223f2a4106c75007702f1a21bf84dc3",
+    "Tests/ContextBench.lean": "dc435982c1a985ade7ce12aef01285528e83910c4bf71e097dfe405ff353577d",
+    "Tests/ContextSupport.lean": "e4b5a7d395239b92cd1d1b9b64ea6794c94189744d106175ddc8cca92cd569a3",
+    "Tests/ContextBridge.lean": "0463d84640d47f933d43a6dc7cc0ec411fd959913ff73f5bc44af86d027130c4",
+    "scripts/benchmark_context.py": "ff04307c875ecccd927a28a4398230c76ae563d9b6c86e7d986d6ed5f533a1d5"
+  },
+  "notes": [
+    "One sample per case and mode.",
+    "Input sizes are Unicode characters, not tokens.",
+    "The benchmark does not record API token usage or generated proof text.",
+    "Helper visibility measures prompt inclusion, not use in the generated proof.",
+    "Saved fixtures use false for the benchmark flag so opening them makes no API calls; the measured runs used true. This flag is at the hole and is excluded from the model prompt.",
+    "No model-backed runs were repeated or repaired. Policy order was full, window, structured for every case."
+  ],
+  "fixtures_default_to_offline": true,
+  "completed_local": "2026-11-13T14:52:46.534003-05:00",
+  "status": "completed",
+  "requests": 27
+}

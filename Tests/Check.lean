@@ -112,6 +112,26 @@ example : True := by
   test_budget
   trivial
 
+elab "test_bounded_repairs" : tactic => do
+  let count ← IO.mkRef (0 : Nat)
+  let generator : Generator := fun _ _ input _ => do
+    let n ← count.get
+    count.set (n + 1)
+    if n == 0 then return "exact staleAttemptOne"
+    if n == 1 then return "exact staleAttemptTwo"
+    if (input.splitOn "staleAttemptOne").length > 1 then
+      throw <| IO.userError "Old failures accumulated in repair history."
+    unless (input.splitOn "staleAttemptTwo").length > 1 do
+      throw <| IO.userError "Latest failure missing from repair history."
+    return "trivial"
+  let result ← generateChecked { attempts := 3, repairChars := 500 } .proof "" "" generator
+  unless result.result == .complete && (← count.get) == 3 do
+    throwError "Expected completion with bounded repair history."
+
+example : True := by
+  test_bounded_repairs
+  trivial
+
 elab "test_no_goals" : tactic => do
   let count ← IO.mkRef (0 : Nat)
   let generator : Generator := fun _ _ _ _ => do

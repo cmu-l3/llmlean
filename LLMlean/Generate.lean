@@ -1,6 +1,7 @@
 module
 public import LLMlean.API
 public import LLMlean.Check
+public import LLMlean.Context
 public import Lean.Meta.Tactic.TryThis
 
 public section
@@ -18,12 +19,14 @@ structure Suggestion where
 
 /-- Both tactics share one bounded generate/check/repair loop. -/
 def generateChecked (settings : Config.Settings) (task : TaskKind) (context : String)
-    (pfx : String := "") (generate : Generator := Responses.generate) : TacticM Suggestion := do
+    (pfx : String := "") (generate : Generator := Responses.generate)
+    (goals? : Option String := none) (startedMs? : Option Nat := none) : TacticM Suggestion := do
   if llmlean.checking.get (← getOptions) then
     throwError "LLM generation cannot be called from a generated tactic."
   let _ ← getMainGoal
-  let started ← IO.monoMsNow
-  let initial := prompt context (← prettyGoals) pfx
+  let started ← match startedMs? with | some t => pure t | none => IO.monoMsNow
+  let goals ← match goals? with | some goals => pure goals | none => prettyGoals
+  let initial := prompt context goals pfx
   let mut history := ""
   let mut diagnostic := "No checked suggestion found."
   for i in [:settings.attempts] do
@@ -51,18 +54,20 @@ def generateChecked (settings : Config.Settings) (task : TaskKind) (context : St
       if task == .step then return { code := candidate.toOption.getD "", result }
       diagnostic := s!"The proof is incomplete. Remaining goals:\n{goals}"
     | .invalid error => diagnostic := error
-    history := history ++ s!"\n\nPrevious attempt:\n{text}\n\nLean feedback:\n{diagnostic}\nProvide a corrected tactic sequence for the original goals in one lean code block. Replace only the tactic hole inside the existing proof; do not repeat the declaration."
+    history := Context.repairHistory text diagnostic settings.repairChars
   throwError "No checked suggestion after {settings.attempts} attempts.\n{diagnostic}"
 
 def suggest (ref : Syntax) (task : TaskKind) (pfx : String := "") : TacticM Unit := do
   if llmlean.checking.get (← getOptions) then
     throwError "LLM generation cannot be called from a generated tactic."
   let settings ← Config.load (← getOptions)
-  let fileMap ← getFileMap
-  let context := match ref.getRange? with
-    | some range => String.Pos.Raw.extract fileMap.source 0 range.start
-    | none => ""
-  let suggestion ← generateChecked settings task context pfx
+  let _ ← getMainGoal
+  let started ← IO.monoMsNow
+  let context ← Context.build settings ref
+  if settings.verbose then
+    logInfo m!"LLMLean context: {context.declarations.size}/{context.candidateCount} declarations, {context.history.length} history characters, {context.render.length + context.goals.length} context characters, {(← IO.monoMsNow) - started} ms ({settings.contextMode})"
+  let suggestion ← generateChecked settings task context.render pfx
+    (goals? := some context.goals) (startedMs? := some started)
   let code ← parseTactics suggestion.code
   let detail := match suggestion.result with
     | .complete => " (closes all goals)"

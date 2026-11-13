@@ -1,0 +1,57 @@
+attempt_limit,candidates,case,context_ms,declarations,error,helper_visible,history_chars,input_chars,instruction_chars,mode,model,repeat,request_ms,requests,solved,total_ms,source_chars
+1,0,imports_same_file,12,0,,True,716,1550,960,full,gpt-6-luna,0,6317,1,True,6350,836
+1,0,imports_same_file,2,0,,True,716,1550,960,window,gpt-6-luna,0,9401,1,True,9438,836
+1,3,imports_same_file,18,3,,True,72,1265,960,structured,gpt-6-luna,0,5981,1,True,6008,836
+1,0,imports_direct,10,0,,False,568,1402,960,full,gpt-6-luna,0,12094,1,True,12117,685
+1,0,imports_direct,2,0,,False,568,1402,960,window,gpt-6-luna,0,6793,1,True,6803,685
+1,3,imports_direct,14,3,,True,72,1265,960,structured,gpt-6-luna,0,7857,1,True,7876,685
+1,0,imports_transitive,2,0,,False,567,1401,960,full,gpt-6-luna,0,8622,1,True,8634,688
+1,0,imports_transitive,2,0,"No checked suggestion after 1 attempts.
+`simp` made no progress",False,567,1401,960,window,gpt-6-luna,0,7876,1,False,7885,688
+1,3,imports_transitive,14,3,,True,72,1265,960,structured,gpt-6-luna,0,6116,1,True,6136,688
+1,0,proofs_short,2,0,,False,976,1810,960,full,gpt-6-luna,0,6530,1,True,6552,1091
+1,0,proofs_short,2,0,"No checked suggestion after 1 attempts.
+Invalid simp theorem: Expected a proposition, but found
+  (x_0 : Type) → List x_0 → x_0 → List x_0",False,976,1810,960,window,gpt-6-luna,0,4715,1,False,4741,1091
+1,11,proofs_short,32,11,,True,72,1714,960,structured,gpt-6-luna,0,6802,1,True,6851,1091
+1,0,proofs_medium,9,0,"No checked suggestion after 1 attempts.
+Invalid simp theorem: Expected a proposition, but found
+  (x_0 : Type) → List x_0 → x_0 → List x_0",False,9088,9922,960,full,gpt-6-luna,0,5130,1,False,5148,9204
+1,0,proofs_medium,7,0,"No checked suggestion after 1 attempts.
+Type mismatch: After simplification, term
+  hlen
+ has type
+  xs.length = n
+but is expected to have type
+  (push₂ xs x).length = n + 2",False,5994,6851,960,window,gpt-6-luna,0,7661,1,False,7678,9204
+1,11,proofs_medium,21,11,,True,72,1714,960,structured,gpt-6-luna,0,7619,1,True,7645,9204
+1,0,proofs_long,21,0,"No checked suggestion after 1 attempts.
+Invalid simp theorem: Expected a proposition, but found
+  (x_0 : Type) → List x_0 → x_0 → List x_0",False,67680,68514,960,full,gpt-6-luna,0,5807,1,False,5838,67794
+1,0,proofs_long,30,0,"No checked suggestion after 1 attempts.
+Type mismatch: After simplification, term
+  hlen
+ has type
+  xs.length = n
+but is expected to have type
+  (push₂ xs x).length = n + 2",False,5977,6834,960,window,gpt-6-luna,0,5488,1,False,5525,67794
+1,11,proofs_long,40,11,,True,72,1714,960,structured,gpt-6-luna,0,4459,1,True,4508,67794
+1,0,declarations_small,2,0,,False,1078,1912,960,full,gpt-6-luna,0,7373,1,True,7386,1199
+1,0,declarations_small,3,0,,False,1078,1912,960,window,gpt-6-luna,0,4728,1,True,4739,1199
+1,13,declarations_small,17,13,,True,72,1826,960,structured,gpt-6-luna,0,5841,1,True,5864,1199
+1,0,declarations_medium,5,0,"No checked suggestion after 1 attempts.
+Invalid simp theorem: Expected a proposition, but found
+  (x_0 : Type) → List x_0 → x_0 → List x_0",False,5758,6592,960,full,gpt-6-luna,0,4714,1,False,4730,5880
+1,0,declarations_medium,7,0,,False,5758,6592,960,window,gpt-6-luna,0,4150,1,True,4173,5880
+1,103,declarations_medium,43,103,,True,72,6957,960,structured,gpt-6-luna,0,7650,1,True,7703,5880
+1,0,declarations_large,13,0,"No checked suggestion after 1 attempts.
+Invalid simp theorem: Expected a proposition, but found
+  (x_0 : Type) → List x_0 → x_0 → List x_0",False,26958,27792,960,full,gpt-6-luna,0,4803,1,False,4830,27079
+1,0,declarations_large,23,0,"No checked suggestion after 1 attempts.
+Type mismatch: After simplification, term
+  hlen
+ has type
+  xs.length = n
+but is expected to have type
+  (push₂ xs x).length = n + 2",False,5977,6834,960,window,gpt-6-luna,0,7626,1,False,7660,27079
+1,503,declarations_large,129,273,,True,72,16929,960,structured,gpt-6-luna,0,8231,1,True,8375,27079

@@ -1,0 +1,46 @@
+{
+  "full": {
+    "solved": 5,
+    "cases": 9,
+    "mean_total_input_chars": 14392.777777777777,
+    "sum_total_input_chars": 129535,
+    "mean_input_chars": 13432.777777777777,
+    "median_total_seconds": 7.832,
+    "median_request_seconds": 7.78,
+    "median_context_ms": 5,
+    "helper_visible": 1
+  },
+  "window": {
+    "solved": 4,
+    "cases": 9,
+    "mean_total_input_chars": 4869.555555555556,
+    "sum_total_input_chars": 43826,
+    "mean_input_chars": 3909.5555555555557,
+    "median_total_seconds": 6.027,
+    "median_request_seconds": 6.007,
+    "median_context_ms": 5,
+    "helper_visible": 1
+  },
+  "all_files": {
+    "solved": 7,
+    "cases": 9,
+    "mean_total_input_chars": 18096.222222222223,
+    "sum_total_input_chars": 162866,
+    "mean_input_chars": 17136.222222222223,
+    "median_total_seconds": 7.435,
+    "median_request_seconds": 7.403,
+    "median_context_ms": 13,
+    "helper_visible": 9
+  },
+  "structured": {
+    "solved": 9,
+    "cases": 9,
+    "mean_total_input_chars": 4809.888888888889,
+    "sum_total_input_chars": 43289,
+    "mean_input_chars": 3849.8888888888887,
+    "median_total_seconds": 7.569,
+    "median_request_seconds": 7.549,
+    "median_context_ms": 22,
+    "helper_visible": 9
+  }
+}
