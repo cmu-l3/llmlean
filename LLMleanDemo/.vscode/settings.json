@@ -1,0 +1,9 @@
+{
+  "lean4.infoview.autoOpen": true,
+  "files.exclude": {
+    "**/.lake": true
+  },
+  "[lean4]": {
+    "editor.tabSize": 2
+  }
+}

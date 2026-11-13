@@ -1,49 +1,21 @@
-import LLMlean.API
+module
+import Mathlib.Tactic
+public import LLMlean
+public meta import LLMlean
 
-open LLMlean LLMlean.Config
+open Lean Elab Tactic LLMlean
 
+-- These assertions deliberately leave the proof state unchanged.
+set_option linter.unusedTactic false
 
-def markdownExample1 : String :=
-  "# Example Markdown File\n" ++
-  "This is an example of a markdown file.\n" ++
-  "Here is a code block:\n" ++
-  "```lean\n" ++
-  "import Mathlib\n" ++
-  "theorem foo (a b : ℕ) : a + a + b = a + b + a := by\n" ++
-  "  ring\n" ++
-  "```\n" ++
-  "And here is some inline code: `x + y = y + x`.\n" ++
-  "## Another Section\n" ++
-  "This is another section of the markdown file.\n" ++
-  "Here is another code block:\n" ++
-  "```lean\n" ++
-  "example {α : Type _} (r s t : Set α) : r ⊆ s → s ⊆ t → r ⊆ t := by\n" ++
-  "  sorry\n" ++
-  "```\n"
+elab "check_mathlib_candidate " code:str : tactic => do
+  let result ← checkCandidate code.getString
+  unless result == .complete do throwError "Expected a complete Mathlib proof, got {repr result}"
 
-def contextExample1 : String :=
-  "import Mathlib\n" ++
-  "theorem foo (a b : ℕ) : a + a + b = a + b + a := by\n"
+example (x y : ℤ) : (x + y) ^ 2 = x ^ 2 + 2 * x * y + y ^ 2 := by
+  check_mathlib_candidate "ring"
+  ring
 
-def codeBlockExample1 : String :=
-  "import Mathlib\n" ++
-  "theorem foo (a b : ℕ) : a + a + b = a + b + a := by\n" ++
-  "  ring\n"
-
-def codeBlockExample2 : String :=
-  "example {α : Type _} (r s t : Set α) : r ⊆ s → s ⊆ t → r ⊆ t := by\n" ++
-  "  sorry\n"
-
--- Test `getMarkdownLeanCodeBlocks
-/--
-info: true
--/
-#guard_msgs in
-#eval getMarkdownLeanCodeBlocks markdownExample1 == [codeBlockExample1, codeBlockExample2]
-
--- Test `getTacticFromBlockContext`
-/--
-info: true
--/
-#guard_msgs in
-#eval getTacticFromBlockContext "import Mathlib\ntheorem foo (a b : ℕ) : a + a + b = a + b + a := by" codeBlockExample1 == "ring"
+example (x : ℝ) (h : 0 < x) : 0 < x + 1 := by
+  check_mathlib_candidate "linarith"
+  linarith

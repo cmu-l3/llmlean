@@ -1,48 +1,46 @@
-### Configurations
+# Configuration
 
-The following configurations let you customize LLMLean. Each variable can be set in the configuration file `~/.config/llmlean/config.toml` (or `C:\Users\<Username>\AppData\Roaming\llmlean\config.toml` on Windows).
+LLMLean reads and validates its optional TOML file once per invocation. Unknown keys and wrong
+types are errors. Numbers and booleans are ordinary TOML values, not quoted strings.
 
-#### LLM in the cloud
-Example:
+| TOML key | Default | Environment variable | Lean option |
+| --- | --- | --- | --- |
+| `provider` | `"local"` | `LLMLEAN_PROVIDER` | `llmlean.provider` |
+| `model` | `"qwen3.5:9b-q4_K_M"` for local; required for cloud | `LLMLEAN_MODEL` | `llmlean.model` |
+| `base_url` | Provider preset | `LLMLEAN_BASE_URL` | `llmlean.baseUrl` |
+| `attempts` | `3` | `LLMLEAN_ATTEMPTS` | `llmlean.attempts` |
+| `timeout_seconds` | `90` | `LLMLEAN_TIMEOUT_SECONDS` | `llmlean.timeoutSeconds` |
+| `max_output_tokens` | `4096` | `LLMLEAN_MAX_OUTPUT_TOKENS` | `llmlean.maxOutputTokens` |
+| `verbose` | `false` | `LLMLEAN_VERBOSE` | `llmlean.verbose` |
 
-- `api`:
-  - `together` : to use Together.ai API
-  - `openai` : to use OpenAI API
-  - `anthropic` : to use Anthropic API
-- `apiKey`:
-  - E.g. [API key](https://api.together.xyz/settings/api-keys) for Together API, or OpenAI / Anthropic API key
-- `endpoint`: API endpoint
-  - E.g. `https://api.together.xyz/v1/completions` for Together API
-- `prompt`:
-  - `fewshot`: for base models
-  - `instruction`: for instruction-tuned models
-- `model`:
-  - Example for Together API: `mistralai/Mixtral-8x7B-Instruct-v0.1`
-  - Example for Open AI: `gpt-4o`
-  - Example for Anthropic: `claude-3-7-sonnet-20250219`
-- `numSamples`:
-  - Example: `10`
-- `mode`:
-  - `parallel`: Generate multiple proof attempts in parallel
-  - `iterative`: Generate and refine proofs based on error feedback
-- `maxIterations`:
-  - Number of refinement iterations in iterative mode (e.g., `3`)
-- `verbose`:
-  - `true`: Show detailed LLM interaction and refinement steps
+Precedence: explicitly set Lean options > environment > file > defaults. An explicit `false`
+or a value equal to the default still overrides a lower-priority setting.
 
-Set each variable in the configuration file, as indicated in [README](../README.md). Alternatively, set environment variables `LLMLEAN_API`, `LLMLEAN_API_KEY`, `LLMLEAN_ENDPOINT`, `LLMLEAN_PROMPT`, `LLMLEAN_MODEL`, `LLMLEAN_NUM_SAMPLES`, `LLMLEAN_MODE`, `LLMLEAN_MAX_ITERATIONS`, and `LLMLEAN_VERBOSE` respectively, or enter `set_option llmlean.<relevant-config> <value>` before `llmstep`/`llmqed` is called.
+```lean
+set_option llmlean.attempts 2 in
+example : True ∧ True := by
+  llmqed
+```
 
-**Note on Iterative Refinement**: This mode works particularly well with models that can understand and learn from error messages. We recommend using instruction-tuned models with the `reasoning` prompt type for best results.
+`attempts` bounds the total number of model calls, including repairs. `timeout_seconds` bounds
+the generation loop; individual requests receive the remaining budget. Candidate evaluation
+also has a 200,000-heartbeat limit. Heartbeats are cooperative, so they are not a hard wall-clock
+timeout for arbitrary metaprograms. `max_output_tokens` includes reasoning tokens. Truncated
+responses produce an error instead of presenting an incomplete fragment as a suggestion.
 
-#### LLM on your laptop
-- `api`:
-  - `ollama` : to use ollama (default)
-- `endpoint`:
-  - With ollama it is `http://localhost:11434/api/generate`
-- `prompt`:
-  - `fewshot`: for base models
-  - `instruction`: for instruction-tuned models
-- `model`:
-  - Example: `solobsd/llemma-7b`
-- `numSamples`:
-  - Example: `10`
+Configuration paths:
+
+1. `LLMLEAN_CONFIG`, if set (an absent explicit file is an error).
+2. `llmlean.toml` in the current working directory, if present. Open the project
+   folder in VS Code or run Lake from that directory to use it.
+3. `%APPDATA%/llmlean/config.toml` on Windows.
+4. `$XDG_CONFIG_HOME/llmlean/config.toml`, when set.
+5. `~/.config/llmlean/config.toml`.
+
+The first matching file is used; project and global files are not merged.
+
+An absent default config file is valid and uses local defaults. Keys are read only from the
+provider's environment variable; putting credentials in TOML or Lean source is unsupported.
+The editor must inherit the environment variables (restart it after changing them).
+
+For old configurations, see [migration](migration.md).

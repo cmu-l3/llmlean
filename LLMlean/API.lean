@@ -1,7 +1,5 @@
-/- Utilities for interacting with LLMlean API endpoints. -/
-import LLMlean.API.Common
-import LLMlean.API.Prompts
-import LLMlean.API.TacticGen
-import LLMlean.API.ProofGen
+module
+public import LLMlean.API.Responses
+public import LLMlean.API.Prompts
 
 -- The imports above make all the functions available in the LLMlean namespace

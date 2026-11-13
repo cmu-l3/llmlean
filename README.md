@@ -1,140 +1,112 @@
 # LLMLean
 
-LLMlean integrates LLMs and Lean for tactic suggestions, proof completion, and more.
+LLMLean integrates LLMs and Lean for tactic suggestions and proof completion.
+You can use an LLM running on your laptop, or an LLM from OpenAI or OpenRouter.
 
-## News
+## Installation
 
-- **10/2025**: Added support for [BFS-Prover-V2](https://arxiv.org/abs/2509.06493) and [BFS-Prover-V1](https://arxiv.org/abs/2502.03438) via Ollama (thanks to [@zeyu-zheng](https://github.com/zeyu-zheng)) [[setup](docs/ollama-models.md#bfs-provers)]
-- **06/2025**: Introduced iterative refinement mode for proof generation
-- **06/2025**: Added support for [Kimina-Prover](https://arxiv.org/abs/2504.11354) models via Ollama (thanks to @BoltonBailey)
+Requires Lean **4.35.0**.
 
-Here's an example of using LLMLean on problems from [Mathematics in Lean](https://github.com/leanprover-community/mathematics_in_lean):
+1. Add LLMLean to your project's `lakefile.lean`:
 
-https://github.com/user-attachments/assets/284a8b32-b7a5-4606-8240-effe086f2b82
+   ```lean
+   require llmlean from git
+     "https://github.com/cmu-l3/llmlean.git"
+   ```
 
-You can use an LLM running on your laptop, or an LLM from the Open AI API or Together.ai API:
+2. Run `lake update llmlean` from your project directory.
 
-<img src="img/llmlean.png" style="width:600px">
+3. Import LLMLean in your Lean file:
 
-#### LLM in the cloud (default):
+   ```lean
+   import LLMlean
+   ```
 
-1. Get an [OpenAI API](https://openai.com/index/openai-api/) key.
+## Setup
 
-2. Modify `~/.config/llmlean/config.toml` (or `C:\Users\<Username>\AppData\Roaming\llmlean\config.toml` on Windows), and enter the following:
+### Option 1: OpenAI
 
-```toml
-api = "openai"
-model = "gpt-4o"
-apiKey = "<your-openai-api-key>"
-```
+1. Get an [OpenAI API key](https://platform.openai.com/api-keys) and set it in your terminal:
 
-(Alternatively, you may set the API key using the environment variable `LLMLEAN_API_KEY` or using `set_option llmlean.apiKey "<your-api-key>"`.)
+   ```sh
+   export OPENAI_API_KEY="<your-api-key>"
+   ```
 
-You can also use other providers such as Anthropic, Together.AI, or any provider adhering to the OpenAI API. See [other providers](docs/other_providers.md).
+2. Create `llmlean.toml` in your project directory:
 
-3. Add `llmlean` to lakefile:
-```lean
-require llmlean from git
-  "https://github.com/cmu-l3/llmlean.git"
-```
+   ```toml
+   provider = "openai"
+   model = "gpt-5.4-mini"
+   ```
 
-4. Import:
-```lean
-import LLMlean
-```
+3. Quit VS Code, then open your project from the same terminal so it picks up the key:
+
+   ```sh
+   code .
+   ```
 
 Now use a tactic described below.
-#### Option 2: LLM on your laptop:
-1. Install [ollama](https://ollama.com/).
 
-2. Pull a language model:
-```bash
-ollama pull wellecks/ntpctx-llama3-8b
-```
+### Option 2: LLM on your laptop
 
-3. Set 2 configuration variables in `~/.config/llmlean/config.toml`:
+1. Install and start [Ollama](https://ollama.com/).
 
-```toml
-api = "ollama"
-model = "wellecks/ntpctx-llama3-8b" # model name from above
-```
+2. Pull a model:
 
-Then do steps (3) and (4) above. Now use a tactic described below.
+   ```sh
+   ollama pull qwen3.5:9b-q4_K_M
+   ```
 
-Many models are available for use in LLMLean via Ollama, including:
-- **[BFS-Prover-V2](docs/ollama-models.md#bfs-provers) (highly recommended for `llmstep`)**
-- **[Kimina Prover](docs/ollama-models.md#kimina-models)**
+3. Set `llmlean.toml` to:
 
-You can find detailed setup instructions and configuration for these and other models in the [Ollama Models](docs/ollama-models.md) document.
+   ```toml
+   provider = "local"
+   model = "qwen3.5:9b-q4_K_M"
+   ```
 
+No API key is needed. Local Ollama is also the default when no configuration is set.
 
 ## Tactics
-### `llmstep` tactic
-Next-tactic suggestions via `llmstep "{prefix}"`. Examples:
 
-- `llmstep ""`
+### `llmstep`
 
-  <img src="img/llmstep_empty.png" style="width:500px">
+Suggest the next tactic:
 
-- `llmstep "apply "`
-
-  <img src="img/llmstep_apply.png" style="width:500px">
-
-The suggestions are checked in Lean.
-
-### `llmqed` tactic
-Complete the current proof via `llmqed`. Examples:
-
-- <img src="img/llmqed_example.png" style="width:500px">
-
-
-The suggestions are checked in Lean.
-
-### Proof Generation Modes
-
-LLMLean supports two modes for proof generation with `llmqed`:
-- **Parallel mode**: Generates multiple proof attempts in parallel
-- **Iterative refinement mode**: Generates one proof attempt, analyzes any errors, and refines the proof based on feedback
-
-To configure:
-```toml
-# In ~/.config/llmlean/config.toml
-mode = "iterative"  # or "parallel"
-```
-
-Enable verbose output to see the refinement process:
 ```lean
-set_option llmlean.verbose true
+example (n : Nat) : n + 0 = n := by
+  llmstep
 ```
 
-*For the best performance, especially for the `llmqed` tactic, we recommend using Anthropic Claude with iterative refinement mode.*
+You can give a prefix, e.g. `llmstep "apply "`.
 
+### `llmqed`
 
+Suggest a completion of the current proof:
 
-## Demo in [PFR](https://github.com/teorth/pfr)
+```lean
+example (P Q : Prop) (h : P ∧ Q) : Q ∧ P := by
+  llmqed
+```
 
-Here is an example of proving a lemma with `llmqed` (OpenAI GPT-4o):
+The suggestions are checked in Lean. Click **Try this** in the Infoview to insert one.
 
-<img src="./img/llmqed_pfr.png" style="width:800px">
+## Demo
 
-And using `llmqed` to make part of an existing proof simpler:
-
-<img src="./img/llmqed_pfr2.png" style="width:800px">
-
-
+The [demo project](LLMleanDemo/README.md) has examples to try in VS Code, with worked solutions.
 
 ## Customization
 
-Please see the following:
-- [Customization](docs/customization.md)
-
+See [customization](docs/customization.md), [other providers](docs/other_providers.md),
+and [migration from older versions](docs/migration.md).
 
 ## Testing
-Tests are under the `LLMleanTest` subdirectory.
-Make sure the versions are the same between `lakefile.lean` and `lean-toolchain` in the root directory and the `LLMleanTest` directory, and then run:
+
+From the LLMLean repository directory:
+
 ```sh
-cd LLMleanTest
-lake update
-lake build
+lake build llmlean
+lake test
+python3 scripts/test_transport.py
 ```
-Then manually try running `llmqed`/`llmstep` on the files under `LLMleanTest`.
+
+Mathlib examples are in [LLMleanTest](LLMleanTest).
