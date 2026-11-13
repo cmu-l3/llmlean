@@ -25,7 +25,10 @@ def prettyGoals : TacticM String := do
 /-- Parse a normal `by` block so bullets, indentation, and multiline tactics keep their meaning. -/
 def parseTactics (code : String) : CoreM (TSyntax ``Parser.Tactic.tacticSeq) := do
   let source := "by\n" ++ String.intercalate "\n" ((code.splitOn "\n").map ("  " ++ ·))
-  let term ← ofExcept (Parser.runParserCategory (← getEnv) `term source)
+  let term ← match Parser.runParserCategory (← getEnv) `term source with
+    | .ok term => pure term
+    | .error error =>
+      throwError "Expected only a tactic sequence inside the existing 'by' proof. Do not return an example, theorem, lemma, imports, or an outer 'by'.\nLean parser: {error}"
   match term with
   | `(term| by $tactics:tacticSeq) => return tactics
   | _ => throwError "Expected a tactic sequence."

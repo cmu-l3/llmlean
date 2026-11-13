@@ -26,6 +26,19 @@ base_url = "http://localhost:8000/v1"
 model = "<server-model-id>"
 ```
 
+For LM Studio, start its server and use the model identifier shown in its Developer tab:
+
+```toml
+provider = "local"
+base_url = "http://localhost:1234/v1"
+model = "qwen/qwen3.5-9b"
+reasoning_effort = "none"
+```
+
+With this model, `reasoning_effort = "none"` turns thinking off for LLMLean requests.
+Use `"default"` to let the server choose, or a supported effort such as `"high"` to enable it.
+Other models and servers may support different efforts.
+
 LLMLean requests text, then reads assistant `output_text` content from the response's `output`
 items. Reasoning items are not treated as Lean code. It reports refusals, truncation, HTTP
 failures, invalid JSON, and empty answers separately. Provider-specific sampling parameters
