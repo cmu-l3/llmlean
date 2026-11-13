@@ -1,69 +1,36 @@
-# Other LLM Providers
+# Providers
 
-LLMLean supports various cloud LLM providers beyond OpenAI. This document covers how to configure them.
+All connections use `POST <base_url>/responses` with stateless requests. LLMLean supplies the
+original goals, source context, and repair feedback on each call. It does not depend on stored
+conversations or `previous_response_id`. The HTTP implementation and proof checker are shared.
 
-## Anthropic
+| Provider | Default base URL | Key environment variable |
+| --- | --- | --- |
+| `local` | `http://localhost:11434/v1` | None required; optional `LLMLEAN_API_KEY` |
+| `openrouter` | `https://openrouter.ai/api/v1` | `OPENROUTER_API_KEY` |
+| `openai` | `https://api.openai.com/v1` | `OPENAI_API_KEY` |
 
-To use Anthropic's Claude models:
-
-1. Get an [Anthropic API](https://www.anthropic.com/api) key.
-
-2. Set configuration variables in `~/.config/llmlean/config.toml`:
-
-```toml
-api = "anthropic"
-model = "claude-3-5-sonnet-20241022"
-apiKey = "<your-anthropic-api-key>"
-```
-
-## Together.AI
-
-To use Together.AI:
-
-1. Get a [Together.AI](https://www.together.ai/) API key.
-
-2. Set configuration variables in `~/.config/llmlean/config.toml`:
+For OpenRouter or OpenAI:
 
 ```toml
-api = "together"
-model = "Qwen/Qwen2.5-72B-Instruct-Turbo"
-apiKey = "<your-together-api-key>"
+provider = "openrouter"
+model = "<model-id-listed-by-the-provider>"
 ```
 
-## OpenAI-Compatible Providers
-
-Many providers offer OpenAI-compatible APIs. For these providers:
-
-1. Get an API key from your provider.
-
-2. Set configuration variables in `~/.config/llmlean/config.toml`:
+An alternative local server must implement the Responses API; Chat Completions compatibility
+alone is insufficient. Point at its API base URL, excluding `/responses`:
 
 ```toml
-api = "openai"
-endpoint = "<provider-endpoint-url>"
-model = "<model-name>"
-apiKey = "<your-api-key>"
+provider = "local"
+base_url = "http://localhost:8000/v1"
+model = "<server-model-id>"
 ```
 
-## Environment Variables
+LLMLean requests text, then reads assistant `output_text` content from the response's `output`
+items. Reasoning items are not treated as Lean code. It reports refusals, truncation, HTTP
+failures, invalid JSON, and empty answers separately. Provider-specific sampling parameters
+and legacy stop tags are not sent. No cloud service is contacted as a local fallback.
 
-For any provider, you can also set configuration using environment variables:
-
-```bash
-export LLMLEAN_API=<api-type>
-export LLMLEAN_ENDPOINT=<endpoint-url>
-export LLMLEAN_MODEL=<model-name>
-export LLMLEAN_API_KEY=<your-api-key>
-```
-
-## Lean Options
-
-You can also set configuration directly in your Lean files:
-
-```lean
-set_option llmlean.api "openai"
-set_option llmlean.model "gpt-4o"
-set_option llmlean.apiKey "<your-api-key>"
-```
-
-Note: Be careful not to commit API keys to version control when using this method.
+Protocol references: [OpenAI Responses](https://developers.openai.com/api/docs/guides/migrate-to-responses),
+[Ollama](https://docs.ollama.com/api/openai-compatibility#responses-api),
+[OpenRouter](https://openrouter.ai/docs/api_reference/responses/overview).

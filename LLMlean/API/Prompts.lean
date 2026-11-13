@@ -1,365 +1,43 @@
-/- Prompt generation for LLMlean -/
-import LLMlean.Config
+module
+public import Lean
 
-open LLMlean.Config
+public section
 
 namespace LLMlean
 
-/--
-See `makePrompts`.
--/
-def makePromptsFewShot (context : String) (state : String) (pre: String) : List String :=
-  let p1 := s!"Given the Lean 4 tactic state, suggest a next tactic.
-Here are some examples:
+inductive TaskKind where
+  | step
+  | proof
+  deriving BEq, Repr, Inhabited
 
-Tactic state:
----
-α : Type u_1
-r : α → α → Prop
-inst✝¹ : DecidableEq α
-inst✝ : IsIrrefl α r
-⊢ CutExpand r ≤ InvImage (Finsupp.Lex (rᶜ ⊓ fun x x_1 => x ≠ x_1) fun x x_1 => x < x_1) ↑toFinsupp
----
-Next tactic:
----
-rintro s t ⟨u, a, hr, he⟩
----
+def instructions (task : TaskKind) : String :=
+  "You are assisting with Lean 4. Use the supplied local context and current goals. " ++
+  (match task with
+    | .step => "Suggest one useful next tactic or short tactic sequence. "
+    | .proof => "Complete all current goals with a tactic sequence. ") ++
+  "Return only the replacement tactic sequence in one fenced lean code block. " ++
+  "Do not repeat the theorem statement, imports, or the outer 'by'. " ++
+  "Do not use sorry, admit, or invoke llmstep/llmqed."
 
-Tactic state:
----
-ι : Type u_1
-I✝ J✝ : Box ι
-x y : ι → ℝ
-I J : WithBot (Box ι)
-⊢ ↑I = ↑J ↔ I = J
----
-Next tactic:
----
-simp only [Subset.antisymm_iff, ← le_antisymm_iff, withBotCoe_subset_iff]
----
+def prompt (context goals pfx : String) : String :=
+  s!"Source before this tactic:\n```lean\n{context}\n```\n\nCurrent goals:\n{goals}" ++
+  (if pfx.isEmpty then "" else s!"\n\nThe replacement must begin with: {pfx}")
 
-Tactic state:
----
-m n : ℕ
-h : Nat.coprime m n
-⊢ Nat.gcd m n = 1
----
-Next tactic:
----
-rw [← h.gcd_eq_one]
----
-
-Tactic state:
----
-{state}
----
-Next tactic:
----
-{pre}"
-  let p2 := match pre with
-  | "" => context
-  | _  => p1
-
-  [p1, p2]
-
-/--
-See `makePrompts`.
--/
-def makePromptsInstruct (context : String) (state : String) (pre: String) : List String :=
-  let p1 := s!"/- You are proving a theorem in Lean 4.
-You are given the following information:
-- The file contents up to the current tactic, inside [CTX]...[/CTX]
-- The current proof state, inside [STATE]...[/STATE]
-
-Your task is to generate the next tactic in the proof.
-Put the next tactic inside [TAC]...[/TAC].
--/
-[CTX]
-{context}
-[/CTX]
-[STATE]
-{state}
-[/STATE]
-[TAC]
-{pre}"
-  [p1]
-
-/--
-See `makePrompts`.
--/
-def makePromptsReasoning (context : String) (state : String) (pre: String) : List String :=
-  let p1 := s!"/- You are proving a theorem in Lean 4.
-You are given the following information:
-- The file contents up to the current tactic, inside [CTX]...[/CTX]
-- The current proof state, inside [STATE]...[/STATE]
-
-Your task is to generate the next tactic in the proof.
-Put the next tactic inside [TAC]...[/TAC].
-If you find it helpful, you can precede the proof with brief thoughts inside [THOUGHTS]...[/THOUGHTS]
-In summary, your output should be of the form:
-[THOUGHTS]
-...
-[/THOUGHTS]
-[TAC]
-...
-[/TAC]
-
-[CTX]
-{context}
-[/CTX]
-[STATE]
-{state}
-[/STATE]
-[THOUGHTS]
-{pre}"
-  [p1]
-
-/--
-See `makePrompts`.
--/
-def makePromptsMarkdownReasoning (context : String) (state : String) (pre: String) : List String :=
-  let p1 := s!"You are proving a theorem in Lean 4.
-You are given the following information:
-
-The file contents up to the current tactic are as follows:
-
-```lean4
-{context}
-```
-
-The current proof state is as follows:
-{state}
-
-Your task is to generate the next tactic in the proof.
-Generate this by writing a markdown file with the completed line, including the context of the file before it
-in a markdown code block.
-
-If you find it helpful, you can precede the proof with brief thoughts. When you are done, end with </think>.
-
-"
-  match pre with
-  | "" => [p1]
-  | pre => [p1 ++ s!"The tactic you generate should start with {pre}"]
-
-/--
-See `makePrompts`.
--/
-def makePromptsTacticState (_context : String) (state : String) (_pre: String) : List String :=
-  let sep := ":::"
-  let p1 := state ++ sep
-  [p1]
-
-/--
-See `makeQedPrompts`.
-TODO implement
--/
-def makeQedPromptsFewShot (context : String) (_state : String) : List String :=
-  let p1 := context
-  [p1]
-
-/--
-See `makeQedPrompts`.
--/
-def makeQedPromptsInstruct (context : String) (_state : String) : List String :=
-  let p1 := s!"/- You are proving a theorem in Lean 4.
-You are given the following information:
-- The current file contents up to and including the theorem statement, inside [CTX]...[/CTX]
-
-Your task is to generate the proof.
-Put the proof inside [PROOF]...[/PROOF]
--/
-[CTX]
-{context}
-[/CTX]
-[PROOF]"
-  [p1]
-
-/--
-See `makeQedPrompts`.
--/
-def makeQedPromptsReasoning (context : String) (state : String) : List String :=
-  let p1 := s!"/- You are proving a theorem in Lean 4.
-You are given the following information:
-- The file contents up to the current tactic, inside [CTX]...[/CTX]
-- The current proof state, inside [STATE]...[/STATE]
-
-Your task is to generate the rest of the proof.
-Put the generation inside [PROOF]...[/PROOF].
-If you find it helpful, you can precede the proof with brief thoughts inside [THOUGHTS]...[/THOUGHTS]
-In summary, your output should be of the form:
-[THOUGHTS]
-...
-[/THOUGHTS]
-[PROOF]
-...
-[/PROOF]
-Your proof will be checked by combining each line with a ; combinator and checking
-the resulting combined tactic.
-Therefore, make sure the proof is formatted as one tactic per line,
-with no additional comments or text.
--/
-[CTX]
-{context}
-[/CTX]
-[STATE]
-{state}
-[/STATE]
-"
-  [p1]
-
-/--
-See `makeQedPrompts`.
--/
-def makeQedPromptsMarkdownReasoning (context : String) (state : String) : List String :=
-  let p1 := s!"You are proving a theorem in Lean 4.
-
-You are given the following information:
-The file contents up to the current tactic are as follows:
-```lean4
-{context}
-```
-The current proof state is as follows:
-{state}
-Your task is to generate the proof.
-Generate this by writing a markdown file with the completed proof, including the context of the file before it
-in a markdown code block.
-
-IMPORTANT: you must end by writing your full proof in the format:
-```lean4
-<... your proof here...>
-```
-
-If you find it helpful, you can precede the proof with brief thoughts, outside the tactic blocks.
-IMPORTANT: Once you have written a complete proof, end with </think>.
-"
-  [p1]
-
-/--
-Makes prompts for single tactic generation,
-given a `context` containing the file contents up to the tactic invocation,
-and a `state` containing the current proof state,
-and a `pre` string containing the prefix of the tactic to be generated.
--/
-def makePrompts (promptKind : PromptKind) (context : String) (state : String) (pre: String) : List String :=
-  match promptKind with
-  | PromptKind.FewShot => makePromptsFewShot context state pre
-  | PromptKind.Reasoning => makePromptsReasoning context state pre
-  | PromptKind.Instruction => makePromptsInstruct context state pre
-  | PromptKind.MarkdownReasoning => makePromptsMarkdownReasoning context state pre
-  | PromptKind.TacticState => makePromptsTacticState context state pre
-
-
-/--
-Makes prompts for the complete proof generation,
-given a `context` containing the file contents up to the tactic invocation,
-and a `state` containing the current proof state.
--/
-def makeQedPrompts (promptKind : PromptKind) (context : String) (state : String) : List String :=
-  match promptKind with
-  | PromptKind.FewShot => makeQedPromptsFewShot context state
-  | PromptKind.Reasoning => makeQedPromptsReasoning context state
-  | PromptKind.Instruction => makeQedPromptsInstruct context state
-  | PromptKind.MarkdownReasoning => makeQedPromptsMarkdownReasoning context state
-  | PromptKind.TacticState => makePromptsTacticState context state ""
-
-def makeQedRefinementPromptsFewShot (context : String) (_state : String)
-    (previousAttempt : String) (errorMsg : String) : List String :=
-  let p1 := s!"/- Previous proof attempt failed.
-Error: {errorMsg}
-
-Previous attempt:
-{previousAttempt}
-
-Please try a different approach.
--/
-{context}"
-  [p1]
-
-def makeQedRefinementPromptsInstruct (context : String) (state : String)
-    (previousAttempt : String) (errorMsg : String) : List String :=
-  let p1 := s!"/- You are proving a theorem in Lean 4.
-Your previous proof attempt failed with the following error:
-{errorMsg}
-
-Previous attempt:
-[PROOF]
-{previousAttempt}
-[/PROOF]
-
-Please provide a corrected proof that addresses this error.
-Put the proof inside [PROOF]...[/PROOF]
--/
-[CTX]
-{context}
-[/CTX]
-[STATE]
-{state}
-[/STATE]
-[PROOF]"
-  [p1]
-
-def makeQedRefinementPromptsReasoning (context : String) (state : String)
-    (previousAttempt : String) (errorMsg : String) : List String :=
-  let p1 := s!"/- You are proving a theorem in Lean 4.
-Your previous proof attempt failed with the following error:
-{errorMsg}
-
-Previous attempt:
-{previousAttempt}
-
-Please analyze what went wrong and provide a corrected proof.
-Put your analysis inside [THOUGHTS]...[/THOUGHTS] and the corrected proof inside [PROOF]...[/PROOF].
-Do not include any additional text outside these blocks.
-Write ONLY the proof inside of [PROOF]...[/PROOF]. For instance, do NOT write ```lean4 ... ```.
--/
-[CTX]
-{context}
-[/CTX]
-[STATE]
-{state}
-[/STATE]
-[THOUGHTS]"
-  [p1]
-
-def makeQedRefinementPromptsMarkdownReasoning (context : String) (state : String)
-    (previousAttempt : String) (errorMsg : String) : List String :=
-  let p1 := s!"You are proving a theorem in Lean 4.
-
-Your previous proof attempt failed with the following error:
-**Error:** {errorMsg}
-
-**Previous attempt:**
-```lean4
-{previousAttempt}
-```
-
-The file contents up to the current tactic are:
-```lean4
-{context}
-```
-
-The current proof state is:
-{state}
-
-Please analyze what went wrong and provide a corrected proof.
-Write your thoughts about the error and then provide the complete corrected proof in a markdown code block.
-
-IMPORTANT: End with your corrected proof in the format:
-```lean4
-<... your corrected proof here...>
-```"
-  [p1]
-
-/--
-Make refinement prompts for proof completion with error context
--/
-def makeQedRefinementPrompts (promptKind : PromptKind) (context : String) (state : String)
-    (previousAttempt : String) (errorMsg : String) : List String :=
-  match promptKind with
-  | PromptKind.FewShot => makeQedRefinementPromptsFewShot context state previousAttempt errorMsg
-  | PromptKind.Instruction => makeQedRefinementPromptsInstruct context state previousAttempt errorMsg
-  | PromptKind.Reasoning => makeQedRefinementPromptsReasoning context state previousAttempt errorMsg
-  | PromptKind.MarkdownReasoning => makeQedRefinementPromptsMarkdownReasoning context state previousAttempt errorMsg
-  | PromptKind.TacticState => makePromptsTacticState context state ""
+/-- Accept one code block or bare tactics; never silently splice multiple alternatives together. -/
+def extractCandidate (text : String) : Except String String := do
+  let text := text.trimAscii.toString
+  let parts := text.splitOn "```"
+  let code ← match parts with
+    | [_] => pure text
+    | [_, block, _] =>
+      let lines := block.splitOn "\n"
+      let language := (lines.headD "").trimAscii.toString
+      unless language == "lean" || language == "lean4" || language.isEmpty do
+        throw "Expected a lean code block."
+      pure (String.intercalate "\n" lines.tail)
+    | _ => throw "Expected exactly one complete Lean code block."
+  let code := code.trimAscii.toString
+  if code.isEmpty then throw "Model returned an empty tactic sequence."
+  return code
 
 end LLMlean
