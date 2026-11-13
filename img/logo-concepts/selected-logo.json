@@ -1,0 +1,11 @@
+{
+  "selected_concept": "08-balanced-proportions.png",
+  "light_asset": "../logo.png",
+  "light_preparation": "Unmodified copy of the selected concept.",
+  "dark_asset": "../logo-dark.png",
+  "dark_preparation": {
+    "tool": "Built-in image_gen",
+    "reference": "08-balanced-proportions.png",
+    "prompt": "Use case: precise-object-edit. Prepare a DARK THEME version of this exact approved LLMLean logo. Preserve the monogram and wordmark EXACTLY: same nested LL and blue M, same smaller-emblem proportions, same font, kerning, spacing, geometry, canvas size and placement. Change only these flat colors: all dark navy logo shapes and letters become #f0f6fc; the blue M becomes #75a7ed; the entire white backdrop becomes SOLID UNIFORM #0d1117. This output has a fully OPAQUE dark background, NOT transparency. Every gap and letter counter also has the same uniform #0d1117 background. Crisp solid fills, sharp clean edges, no texture, noise, speckles, gradients, shadows, glows, dust, white halos, extra marks, or additional text. Do not reinterpret or redesign anything."
+  }
+}

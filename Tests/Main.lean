@@ -1,5 +1,6 @@
 module
 import Tests.Check
+import Tests.Context
 import LLMlean
 
 open Lean LLMlean
@@ -13,8 +14,17 @@ private def expectFailure (action : IO α) : IO Unit := do
 
 private def configTests : IO Unit := do
   let settings ← IO.ofExcept (Config.resolve)
-  ensure (settings.provider == "local" && settings.model == Config.defaultModel) "Local defaults"
-  ensure (settings.responsesUrl == "http://localhost:11434/v1/responses") "Responses URL"
+  ensure (settings.provider == "openai" && settings.model == "gpt-6-luna") "OpenAI defaults"
+  ensure (settings.responsesUrl == "https://api.openai.com/v1/responses" &&
+    settings.apiKeyEnv == "OPENAI_API_KEY") "Default OpenAI endpoint and credentials"
+  let localSettings ← IO.ofExcept (Config.resolve { provider := some "local" })
+  ensure (localSettings.model == "qwen3.5:9b-q4_K_M" &&
+    localSettings.responsesUrl == "http://localhost:11434/v1/responses" &&
+    localSettings.apiKeyEnv == "LLMLEAN_API_KEY") "Explicit local provider retains Ollama defaults"
+  let explicitDefault ← IO.ofExcept (Config.resolve { provider := some "local" } {}
+    (({} : Options).set `llmlean.provider "openai"))
+  ensure (explicitDefault.provider == "openai" && explicitDefault.model == "gpt-6-luna")
+    "Explicit default provider must override the file and select its own model"
   ensure (settings.reasoningEffort == "default") "Preserve server reasoning defaults unless configured."
   let reasoningFile ← Config.parse "reasoning_effort = 'none'\n"
   let reasoning ← IO.ofExcept (Config.resolve reasoningFile)
@@ -32,18 +42,28 @@ private def configTests : IO Unit := do
   let resolved ← IO.ofExcept (Config.resolve file { model := some "env-model" }
     (opts.set `llmlean.model "option-model"))
   ensure (resolved.model == "option-model") "Lean option precedence"
+  let contextFile ← Config.parse "context_mode = 'window'\nhistory_chars = 100\npremise_chars = 200\nnotation_chars = 300\nrepair_chars = 400\ndefinition_chars = 500\n"
+  let contextSettings ← IO.ofExcept (Config.resolve contextFile { historyChars := some 60 }
+    (({} : Options).set `llmlean.historyChars (0 : Nat)))
+  ensure (contextSettings.contextMode == "window" && contextSettings.historyChars == 0 &&
+    contextSettings.premiseChars == 200 && contextSettings.notationChars == 300 &&
+    contextSettings.repairChars == 400 && contextSettings.definitionChars == 500)
+    "Context budgets and explicit zero option precedence"
+  let allFiles ← IO.ofExcept (Config.resolve (← Config.parse "context_mode = 'all_files'\n"))
+  ensure (allFiles.contextMode == "all_files") "All imported project sources mode"
   let resolved ← IO.ofExcept (Config.resolve { baseUrl := some "http://localhost:8000/v1/" })
   ensure (resolved.responsesUrl == "http://localhost:8000/v1/responses") "Trailing slash"
+  expectFailure (IO.ofExcept (Config.resolve { provider := some "openrouter" }))
   for provider in ["openai", "openrouter"] do
-    expectFailure (IO.ofExcept (Config.resolve { provider := some provider }))
     let s ← IO.ofExcept (Config.resolve { provider := some provider, model := some "chosen-model" })
     ensure (s.model == "chosen-model" && s.apiKeyEnv != "LLMLEAN_API_KEY") "Cloud model/key"
   for source in ["attempts = '3'", "verbose = 'false'", "attempts = -1", "reasoning_effort = false",
-      "mode = 'iterative'", "apiKey = 'must-not-be-accepted'", "unknown = 1", "model = ["] do
+      "mode = 'iterative'", "apiKey = 'must-not-be-accepted'", "unknown = 1", "model = [",
+      "history_chars = -1", "premise_chars = '100'", "context_mode = false"] do
     expectFailure (Config.parse source)
   for file in [({ attempts := some 0 } : Config.Overrides), { maxOutputTokens := some 0 },
       { timeoutSeconds := some 0 }, { provider := some "anthropic" }, { model := some "" },
-      { reasoningEffort := some "off" },
+      { reasoningEffort := some "off" }, { contextMode := some "unknown" },
       { baseUrl := some "http://localhost/v1/responses" }, { baseUrl := some "not-a-url" }] do
     expectFailure (IO.ofExcept (Config.resolve file))
 
@@ -90,4 +110,9 @@ private def responseTests : IO Unit := do
 public def main : IO Unit := do
   configTests
   responseTests
+  ensure (Context.historyWindow "before\nαβ🙂\nlast" 9 == "αβ🙂\nlast") "Unicode line-aligned window"
+  ensure (Context.historyWindow "αβ🙂δε" 3 == "🙂δε") "Oversized line stays Unicode-safe"
+  ensure (Context.historyWindow "anything" 0 == "") "Zero history budget"
+  ensure ((Context.repairHistory (String.ofList (List.replicate 2000 'a'))
+    (String.ofList (List.replicate 2000 'β')) 120).length ≤ 120) "Bounded repair history"
   IO.println "Offline configuration, Responses, and proof-checking tests passed."

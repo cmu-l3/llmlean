@@ -1,0 +1,74 @@
+attempt_limit,candidates,case,context_ms,declarations,error,helper_visible,history_chars,imported_files,imported_source_chars,input_chars,instruction_chars,mode,model,repeat,request_ms,requests,solved,total_input_chars,total_ms,source_chars
+1,0,imports_same_file,14,0,,True,716,[],0,1550,960,full,gpt-6-luna,0,11361,1,True,2510,11406,836
+1,0,imports_same_file,4,0,,True,716,[],0,1550,960,window,gpt-6-luna,0,6007,1,True,2510,6027,836
+1,0,imports_same_file,13,0,,True,716,['Tests.ContextBench'],3068,4675,960,all_files,gpt-6-luna,0,6575,1,True,5635,6600,836
+1,3,imports_same_file,22,3,,True,72,[],0,1265,960,structured,gpt-6-luna,0,5725,1,True,2225,5754,836
+1,0,imports_direct,2,0,,False,568,[],0,1402,960,full,gpt-6-luna,0,7780,1,True,2362,7832,685
+1,0,imports_direct,5,0,,False,568,[],0,1402,960,window,gpt-6-luna,0,4826,1,True,2362,4849,685
+1,0,imports_direct,11,0,,True,568,"['Tests.ContextBench', 'Tests.ContextSupport']",3636,5154,960,all_files,gpt-6-luna,0,7449,1,True,6114,7475,685
+1,3,imports_direct,13,3,,True,72,[],0,1265,960,structured,gpt-6-luna,0,6970,1,True,2225,6995,685
+1,0,imports_transitive,6,0,,False,567,[],0,1401,960,full,gpt-6-luna,0,11225,1,True,2361,11247,688
+1,0,imports_transitive,4,0,,False,567,[],0,1401,960,window,gpt-6-luna,0,5990,1,True,2361,6002,688
+1,0,imports_transitive,11,0,"No checked suggestion after 1 attempts.
+Invalid simp theorem: Expected a proposition, but found
+  (x_0 : Type) → List x_0 → x_0 → List x_0",True,567,"['Tests.ContextBench', 'Tests.ContextSupport', 'Tests.ContextBridge']",3768,5343,960,all_files,gpt-6-luna,0,5228,1,False,6303,5247,688
+1,3,imports_transitive,13,3,,True,72,[],0,1265,960,structured,gpt-6-luna,0,8339,1,True,2225,8360,688
+1,0,proofs_short,3,0,"No checked suggestion after 1 attempts.
+Invalid simp theorem: Expected a proposition, but found
+  (x_0 : Type) → List x_0 → x_0 → List x_0",False,976,[],0,1810,960,full,gpt-6-luna,0,11103,1,False,2770,11121,1091
+1,0,proofs_short,3,0,,False,976,[],0,1810,960,window,gpt-6-luna,0,10319,1,True,2770,10332,1091
+1,0,proofs_short,9,0,,True,976,"['Tests.ContextBench', 'Tests.ContextSupport']",3636,5562,960,all_files,gpt-6-luna,0,8282,1,True,6522,8297,1091
+1,11,proofs_short,15,11,,True,72,[],0,1714,960,structured,gpt-6-luna,0,7549,1,True,2674,7569,1091
+1,0,proofs_medium,5,0,"No checked suggestion after 1 attempts.
+Invalid simp theorem: Expected a proposition, but found
+  (x_0 : Type) → List x_0 → x_0 → List x_0",False,9088,[],0,9922,960,full,gpt-6-luna,0,10331,1,False,10882,10350,9204
+1,0,proofs_medium,8,0,"No checked suggestion after 1 attempts.
+Tactic `assumption` failed
+
+α : Type
+xs : List α
+x : α
+n : Nat
+h : xs.length = n
+hlen : xs.length + 2 = n + 2
+⊢ (push₂ xs x).length = n + 2",False,5994,[],0,6851,960,window,gpt-6-luna,0,6121,1,False,7811,6138,9204
+1,0,proofs_medium,14,0,,True,9088,"['Tests.ContextBench', 'Tests.ContextSupport']",3636,13674,960,all_files,gpt-6-luna,0,8577,1,True,14634,8606,9204
+1,11,proofs_medium,25,11,,True,72,[],0,1714,960,structured,gpt-6-luna,0,7939,1,True,2674,7969,9204
+1,0,proofs_long,21,0,"No checked suggestion after 1 attempts.
+Invalid simp theorem: Expected a proposition, but found
+  (x_0 : Type) → List x_0 → x_0 → List x_0",False,67680,[],0,68514,960,full,gpt-6-luna,0,7665,1,False,69474,7694,67794
+1,0,proofs_long,21,0,"No checked suggestion after 1 attempts.
+Type mismatch: After simplification, term
+  hlen
+ has type
+  xs.length = n
+but is expected to have type
+  (push₂ xs x).length = n + 2",False,5977,[],0,6834,960,window,gpt-6-luna,0,4446,1,False,7794,4475,67794
+1,0,proofs_long,34,0,,True,67680,"['Tests.ContextBench', 'Tests.ContextSupport']",3636,72266,960,all_files,gpt-6-luna,0,4840,1,True,73226,4883,67794
+1,11,proofs_long,39,11,,True,72,[],0,1714,960,structured,gpt-6-luna,0,5983,1,True,2674,6032,67794
+1,0,declarations_small,2,0,,False,1078,[],0,1912,960,full,gpt-6-luna,0,6673,1,True,2872,6686,1199
+1,0,declarations_small,2,0,"No checked suggestion after 1 attempts.
+Invalid simp theorem: Expected a proposition, but found
+  (x_0 : Type) → List x_0 → x_0 → List x_0",False,1078,[],0,1912,960,window,gpt-6-luna,0,7595,1,False,2872,7605,1199
+1,0,declarations_small,9,0,,True,1078,"['Tests.ContextBench', 'Tests.ContextSupport']",3636,5664,960,all_files,gpt-6-luna,0,6811,1,True,6624,6824,1199
+1,13,declarations_small,12,13,,True,72,[],0,1826,960,structured,gpt-6-luna,0,8520,1,True,2786,8538,1199
+1,0,declarations_medium,4,0,"No checked suggestion after 1 attempts.
+Invalid simp theorem: Expected a proposition, but found
+  (x_0 : Type) → List x_0 → x_0 → List x_0",False,5758,[],0,6592,960,full,gpt-6-luna,0,4847,1,False,7552,4865,5880
+1,0,declarations_medium,7,0,"No checked suggestion after 1 attempts.
+Invalid simp theorem: Expected a proposition, but found
+  (x_0 : Type) → List x_0 → x_0 → List x_0",False,5758,[],0,6592,960,window,gpt-6-luna,0,3943,1,False,7552,3958,5880
+1,0,declarations_medium,13,0,"No checked suggestion after 1 attempts.
+Invalid simp theorem: Expected a proposition, but found
+  (x_0 : Type) → List x_0 → x_0 → List x_0",True,5758,"['Tests.ContextBench', 'Tests.ContextSupport']",3636,10344,960,all_files,gpt-6-luna,0,10101,1,False,11304,10124,5880
+1,103,declarations_medium,35,103,,True,72,[],0,6957,960,structured,gpt-6-luna,0,10800,1,True,7917,10844,5880
+1,0,declarations_large,13,0,,False,26958,[],0,27792,960,full,gpt-6-luna,0,6659,1,True,28752,6677,27079
+1,0,declarations_large,14,0,"No checked suggestion after 1 attempts.
+Type mismatch: After simplification, term
+  hlen
+ has type
+  xs.length = n
+but is expected to have type
+  (push₂ xs x).length = n + 2",False,5977,[],0,6834,960,window,gpt-6-luna,0,9320,1,False,7794,9343,27079
+1,0,declarations_large,24,0,,True,26958,"['Tests.ContextBench', 'Tests.ContextSupport']",3636,31544,960,all_files,gpt-6-luna,0,7403,1,True,32504,7435,27079
+1,503,declarations_large,121,273,,True,72,[],0,16929,960,structured,gpt-6-luna,0,5089,1,True,17889,5218,27079

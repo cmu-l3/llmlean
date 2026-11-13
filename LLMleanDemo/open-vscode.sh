@@ -2,11 +2,11 @@
 set -euo pipefail
 
 demo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-provider="${1:-local}"
+provider="${1:-openai}"
 
 case "$provider" in
   local)
-    export LLMLEAN_CONFIG="$demo_dir/llmlean.toml"
+    export LLMLEAN_CONFIG="$demo_dir/llmlean.local.toml"
     ;;
   openai)
     export LLMLEAN_CONFIG="$demo_dir/llmlean.openai.toml"

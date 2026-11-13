@@ -59,7 +59,10 @@ def checkCandidate (code : String) : TacticM CheckResult := withoutModifyingStat
           if ← containsSorry proof then throwError "Candidate contains a sorry/admit dependency."
           if remaining.isEmpty then
             if proof.hasMVar then throwError "Candidate left unresolved proof metavariables."
-            checkWithKernel proof
+            -- `have`/`let` declarations can retain assigned metavariables in their
+            -- types or values. The kernel does not consult the elaborator's assignments.
+            withLCtx' (← instantiateLCtxMVars (← getLCtx)) do
+              checkWithKernel proof
             unless ← isDefEq (← inferType proof) (← goal.getType) do
               throwError "Candidate proves a different goal."
       if remaining.isEmpty then return .complete

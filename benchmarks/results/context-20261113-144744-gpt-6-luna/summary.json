@@ -1,0 +1,32 @@
+{
+  "full": {
+    "solved": 5,
+    "cases": 9,
+    "median_total_seconds": 6.35,
+    "mean_total_seconds": 6.842777777777777,
+    "median_request_seconds": 6.317,
+    "mean_input_chars": 13432.777777777777,
+    "median_context_ms": 9,
+    "helper_visible": 1
+  },
+  "window": {
+    "solved": 4,
+    "cases": 9,
+    "median_total_seconds": 6.803,
+    "mean_total_seconds": 6.515777777777777,
+    "median_request_seconds": 6.793,
+    "mean_input_chars": 3909.5555555555557,
+    "median_context_ms": 3,
+    "helper_visible": 1
+  },
+  "structured": {
+    "solved": 9,
+    "cases": 9,
+    "median_total_seconds": 6.851,
+    "mean_total_seconds": 6.774,
+    "median_request_seconds": 6.802,
+    "mean_input_chars": 3849.8888888888887,
+    "median_context_ms": 21,
+    "helper_visible": 9
+  }
+}

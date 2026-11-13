@@ -15,6 +15,7 @@ def instructions (task : TaskKind) : String :=
   "Your response replaces only the current llmstep/llmqed invocation. " ++
   "The surrounding declaration and its 'by' already exist. " ++
   "Use the supplied local context and current goals. " ++
+  "Prefer the supplied qualified declaration names. The current declaration is an unfinished target, not a proved premise. " ++
   (match task with
     | .step => "Suggest one useful next tactic or short tactic sequence. "
     | .proof => "Complete all current goals with a tactic sequence. ") ++
@@ -30,7 +31,7 @@ def instructions (task : TaskKind) : String :=
   "```lean\nconstructor\n· trivial\n· trivial\n```"
 
 def prompt (context goals pfx : String) : String :=
-  s!"Existing source before the tactic hole (context only; do not repeat):\n```lean\n{context}\n```\n\nCurrent goals:\n{goals}" ++
+  s!"Context (reference only; do not repeat):\n{context}\n\nCurrent goals and local hypotheses:\n{goals}" ++
   "\n\nFill only the tactic hole with a tactic sequence, not a declaration or a whole proof file." ++
   (if pfx.isEmpty then "" else s!"\n\nThe replacement must begin with: {pfx}")
 

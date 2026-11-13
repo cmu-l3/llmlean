@@ -1,0 +1,3 @@
+# Selected by: bash open-vscode.sh local
+provider = "local"
+model = "qwen3.5:9b-q4_K_M"

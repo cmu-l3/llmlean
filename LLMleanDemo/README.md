@@ -1,6 +1,7 @@
 # LLMLean demo
 
-Try `llmstep` and `llmqed` in VS Code. This demo uses LLMLean from the parent directory.
+Try `llmstep` and `llmqed` interactively in [VS Code](https://code.visualstudio.com/).
+This demo uses LLMLean from the parent directory.
 
 ## OpenAI
 
@@ -20,7 +21,8 @@ Try `llmstep` and `llmqed` in VS Code. This demo uses LLMLean from the parent di
 4. In [Demo.lean](Demo.lean), replace a `sorry` with `llmstep` or `llmqed`.
    Click **Try this** in the Infoview to accept the suggestion.
 
-The model is set in [llmlean.openai.toml](llmlean.openai.toml).
+The default is OpenAI with `gpt-6-luna`, set in [llmlean.openai.toml](llmlean.openai.toml).
+Running `bash open-vscode.sh` without an argument also selects OpenAI.
 If you change your key, close the demo's VS Code instance and relaunch it.
 
 ## Local model
@@ -32,9 +34,14 @@ ollama pull qwen3.5:9b-q4_K_M
 bash open-vscode.sh local
 ```
 
-Local settings are in [llmlean.toml](llmlean.toml).
+Local settings are in [llmlean.local.toml](llmlean.local.toml).
 
 ## Using the demo
+
+For examples with project context, open [Context.lean](Context.lean). It develops a
+warehouse dispatch system using the path and invariant lemmas in
+[Context/Reachability.lean](Context/Reachability.lean). Replace a `sorry` with
+`llmqed`, or insert `llmcontext` to inspect the supplied context.
 
 Try one example at a time. The proof stays unfinished until you accept a suggestion;
 `llmstep` may leave more goals to solve. Editing an active LLM tactic can send another request.

@@ -1,4 +1,4 @@
 # Selected by: bash open-vscode.sh openai
 # Credentials come from OPENAI_API_KEY, never this file.
 provider = "openai"
-model = "gpt-5.4-mini"
+model = "gpt-6-luna"

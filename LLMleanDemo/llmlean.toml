@@ -1,4 +1,6 @@
 # Project-local settings take precedence over the global configuration file.
-provider = "local"
-model = "qwen3.5:9b-q4_K_M"
-base_url = "http://localhost:11434/v1"
+# provider = "local"
+# model = "qwen3.5:9b-q4_K_M"
+# base_url = "http://localhost:11434/v1"
+provider = "openai"
+model = "gpt-6-luna"
