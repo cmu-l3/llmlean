@@ -14,3 +14,7 @@ lean_lib Tests where
 @[test_driver]
 lean_exe llmlean_tests where
   root := `Tests.Main
+
+input_file optimizeFrontend where
+  path := "optimizer/Frontend435.lean"
+  text := true

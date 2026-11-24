@@ -1,5 +1,6 @@
 module
 import Tests.Check
+import Tests.OptimizeVerdict
 import Tests.Context
 import LLMlean
 

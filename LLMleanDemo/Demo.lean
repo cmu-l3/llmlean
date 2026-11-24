@@ -50,3 +50,9 @@ example (P Q R : Prop) (hp : P) (hq : Q) (hr : R) : P ∧ Q ∧ R := by
 example (α : Type) (xs ys : List α) :
     (xs ++ ys).length = xs.length + ys.length := by
   simp
+
+-- 6. Rewrite a proof. Put the cursor inside this theorem and choose “LLMLean: Optimize proof”.
+public theorem Demo.swap (P Q : Prop) (h : P ∧ Q) : Q ∧ P := by
+  have hp : P := h.left
+  have hq : Q := h.right
+  exact ⟨hq, hp⟩
