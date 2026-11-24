@@ -23,6 +23,7 @@ jobs:
       - run: lake build llmlean
       - run: lake -d LLMleanDemo build
       - run: python3 scripts/test_transport.py
+      - run: python3 scripts/test_optimize.py
 
   mathlib:
     runs-on: ubuntu-latest

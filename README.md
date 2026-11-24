@@ -24,7 +24,7 @@
 </p>
 
 <p align="center">
-  LLMLean integrates LLMs and Lean for tactic suggestions and proof completion.
+  LLMLean integrates LLMs and Lean for tactic suggestions, proof completion, proof optimization, and more.
 </p>
 
 <p align="center">
@@ -41,7 +41,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="img/architecture-dark.svg">
-    <img src="img/architecture.svg" alt="LLMLean connects your Lean proof to cloud models through OpenAI or OpenRouter, or to local models through LM Studio or Ollama. Suggestions are checked in Lean." width="900">
+    <img src="img/architecture.svg" alt="llmstep suggests a step, llmqed completes a proof, and llmoptimize rewrites a proof. Lean checks suggestions from cloud models (OpenAI or OpenRouter) or local models (LM Studio or Ollama)." width="900">
   </picture>
 </p>
 
@@ -73,7 +73,31 @@ example (P Q : Prop) (h : P ∧ Q) : Q ∧ P := by
 Both tactics check suggestions in Lean and can retry with Lean's error messages.
 Click **Try this** in the Infoview to insert a suggestion into your proof.
 
+[![Watch the llmqed proof completion demo](video/llmqed.webp)](video/llmqed.mov)
+
 The [demo project](LLMleanDemo/README.md) has examples to try in VS Code, with worked solutions.
+
+### Rewrite a proof
+
+Use the **LLMLean: Optimize proof** code action to rewrite a proof with fewer tokens and/or fewer explicit lemmas.
+
+```diff
+ theorem swap (P Q : Prop) (h : P ∧ Q) : Q ∧ P := by
+-  have hp : P := h.left
+-  have hq : Q := h.right
+-  exact ⟨hq, hp⟩
++  grind
+```
+
+[![Watch the llmoptimize proof rewrite demo](video/optimize.webp)](video/optimize.mov)
+
+Inspired by the proof optimization metrics in [ImProver 2](https://arxiv.org/abs/2605.22885).
+
+Proof optimization is also available on the CLI.
+
+```sh
+lake exe llmlean optimize LLMleanDemo/Demo.lean --decl Demo.swap
+```
 
 ## Installation
 
@@ -97,6 +121,7 @@ Requires Lean **4.35.0**.
 ## Setup
 
 OpenAI with `gpt-6-luna` is the default.
+To customize the provider or model, add `llmlean.toml` to your project root.
 
 <details open>
 <summary><strong>OpenAI</strong> · Cloud models · Default</summary>
@@ -183,6 +208,14 @@ No API key is needed.
 
 For other servers and connection details, see the [provider guide](docs/other_providers.md).
 Local servers must support the Responses API.
+
+<details>
+<summary><strong>Customizing LLMLean's proof optimization</strong></summary>
+
+To customize LLMLean's proof optimization features (see [Rewrite a proof](#rewrite-a-proof)), create `llmlean-optimize.toml` in your project root.
+Otherwise, proof optimization uses your existing LLMLean settings, including those from `llmlean.toml`.
+
+</details>
 
 ## Project context
 

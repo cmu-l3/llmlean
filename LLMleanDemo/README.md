@@ -38,6 +38,10 @@ Local settings are in [llmlean.local.toml](llmlean.local.toml).
 
 ## Using the demo
 
+To try proof optimization, place the cursor inside `Demo.swap` in [Demo.lean](Demo.lean)
+and choose **LLMLean: Optimize proof** from the code actions. For a longer proof with
+imported lemmas, try `Warehouse.two_shift_shipments` in [Context.lean](Context.lean).
+
 For examples with project context, open [Context.lean](Context.lean). It develops a
 warehouse dispatch system using the path and invariant lemmas in
 [Context/Reachability.lean](Context/Reachability.lean). Replace a `sorry` with

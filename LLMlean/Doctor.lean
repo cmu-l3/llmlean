@@ -1,11 +1,15 @@
 module
-import LLMlean.API.Responses
+import LLMlean.Optimize.CLI
 
 open Lean LLMlean
 
 public def main (args : List String) : IO UInt32 := do
+  if let "optimize" :: rest := args then
+    try return ← Optimize.cli rest catch e =>
+      (← IO.getStderr).putStrLn s!"LLMLean: {e}"
+      return 1
   unless args == ["doctor"] || args == ["doctor", "--offline"] do
-    IO.println "Usage: lake exe llmlean doctor [--offline]"
+    IO.println ("Usage: lake exe llmlean doctor [--offline]\n" ++ Optimize.usage)
     return if args == ["--help"] then 0 else 1
   try
     let settings ← Config.load

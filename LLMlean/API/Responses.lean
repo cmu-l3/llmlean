@@ -80,18 +80,39 @@ def parseHttp (stdout : String) : Except String Json := do
   | .ok json => return json
   | .error _ => throw "Server returned invalid JSON. Check that base_url points to a Responses API."
 
+private def curlOutput (args : IO.Process.SpawnArgs) (input : String)
+    (cancelled? : Option (BaseIO Bool)) : IO IO.Process.Output := do
+  let some cancelled := cancelled? | return ← IO.Process.output args (some input)
+  let child ← do
+    let (stdin, child) ← (← IO.Process.spawn { args with stdin := .piped, stdout := .piped, stderr := .piped }).takeStdin
+    stdin.putStr input
+    stdin.flush
+    pure child
+  let stdout ← IO.asTask child.stdout.readToEnd .dedicated
+  let stderr ← IO.asTask child.stderr.readToEnd .dedicated
+  repeat
+    if let some exitCode ← child.tryWait then
+      return { exitCode, stdout := ← IO.ofExcept stdout.get, stderr := ← IO.ofExcept stderr.get }
+    if ← cancelled then
+      child.kill
+      discard child.wait
+      throw <| IO.userError "Optimization cancelled."
+    IO.sleep 100
+  throw <| IO.userError "Model request ended unexpectedly."
+
 /-- Shared transport. HTTP failures are not retried automatically, avoiding duplicate paid requests. -/
-def send (url key : String) (body : Option Json) (timeoutMs : Nat) : IO Json := do
+def send (url key : String) (body : Option Json) (timeoutMs : Nat)
+    (cancelled? : Option (BaseIO Bool) := none) : IO Json := do
   if timeoutMs == 0 then throw <| IO.userError "LLMLean time budget exhausted."
   let seconds := toString (Float.ofNat timeoutMs / 1000.0)
   let connectSeconds := toString (Float.ofNat (min 10000 timeoutMs) / 1000.0)
-  let result ← IO.Process.output {
+  let result ← curlOutput {
     cmd := "curl"
     args := #["--disable", "--silent", "--show-error", "--connect-timeout", connectSeconds,
       "--max-time", seconds, "--max-filesize", "16777216",
       "--request", if body.isSome then "POST" else "GET",
       "--write-out", "\n%{http_code}", "--config", "-"]
-  } (some (curlConfig url key body))
+  } (curlConfig url key body) cancelled?
   if result.exitCode == 28 then
     throw <| IO.userError "Model request timed out. Increase timeout_seconds or choose a smaller model."
   if result.exitCode != 0 then
