@@ -31,7 +31,9 @@ private def partialVerdict (before after : Record) : String × Array (Option Nat
 #guard partialVerdict { original with extraction := ⟨"partial"⟩ } candidate ==
   ("Could not count all explicitly named lemmas in the original proof.", #[none, some 1])
 #guard !improves original { candidate with proof.length_tokens := 4 }
-#guard !improves original { candidate with proof.explicit_lemma_refs := #["a", "b", "c"] }
+#guard improves original { candidate with proof.explicit_lemma_refs := #["a", "b", "c"] }
+#guard improves original { candidate with proof.length_tokens := 3 }
+#guard !improves original { original with proof.explicit_lemma_refs := #["a", "b", "c"] }
 #guard !improves original { candidate with proof.axioms := #["New.ax"] }
 #guard !improves { original with proof.axioms := #["sorryAx"] } candidate
 #guard !improves original { candidate with proof.axioms := #["Lean.ofReduceBool"] }

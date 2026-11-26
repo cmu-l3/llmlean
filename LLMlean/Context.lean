@@ -205,8 +205,8 @@ private def projectRoot : CoreM System.FilePath := do
 
 /-- Membership is determined by the resolved build path, not a declaration's namespace.
 The environment's module data is already an imported-module declaration index. -/
-private def projectModules : CoreM (Array (Name × ModuleData)) := do
-  let root ← projectRoot
+private def projectModules (root? : Option System.FilePath := none) : CoreM (Array (Name × ModuleData)) := do
+  let root ← root?.elim projectRoot pure
   let env ← getEnv
   let mut roots : Std.HashMap Name Bool := {}
   let mut modules := #[]
@@ -258,7 +258,7 @@ private def usableName (env : Environment) (name : Name) (localDecl : Bool)
   return true
 
 /-- Candidate extraction is independent of ranking so a future premise selector can replace it. -/
-def collectCandidates (target : Option Name) : CoreM (Array Candidate) := do
+def collectCandidates (target : Option Name) (root? : Option System.FilePath := none) : CoreM (Array Candidate) := do
   let env ← getEnv
   let mut candidates := #[]
   for info in ← env.getLocalConstantInfos (skipTheoremSubDecls := true) do
@@ -266,7 +266,7 @@ def collectCandidates (target : Option Name) : CoreM (Array Candidate) := do
       candidates := candidates.push {
         name := info.name, type := info.toConstantVal.type, kind := info.kind,
         moduleName := env.mainModule, localDecl := true, order := candidates.size }
-  for (moduleName, data) in ← projectModules do
+  for (moduleName, data) in ← projectModules root? do
     for info in data.constants do
       if usableName env info.name false target then
         candidates := candidates.push {

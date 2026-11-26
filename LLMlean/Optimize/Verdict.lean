@@ -46,6 +46,11 @@ def hasForbiddenAxiom (proof : Proof) : Bool :=
 def rejected (detail : String) : Json :=
   Json.mkObj [("improved", toJson false), ("detail", toJson detail)]
 
+/-- Order verified proofs by source tokens, breaking ties by distinct explicitly named lemmas. -/
+def betterScore : Nat × Nat → Nat × Nat → Bool
+  | (tokens, lemmas), (otherTokens, otherLemmas) =>
+    tokens < otherTokens || (tokens == otherTokens && lemmas < otherLemmas)
+
 def compare (original candidate : Record) (replacement : String) (elapsedMs : Nat) : Json := Id.run do
   if let .error reason := checkIdentity original.declaration replacement candidate then
     return rejected reason
@@ -69,7 +74,7 @@ def compare (original candidate : Record) (replacement : String) (elapsedMs : Na
   unless beforeComplete && afterComplete do
     let which := if beforeComplete then "the rewrite" else if afterComplete then "the original proof" else "either proof"
     return (rejected s!"Could not count all explicitly named lemmas in {which}.").setObjVal! "metrics" metrics
-  unless newTokens ≤ tokens && newLemmas ≤ lemmas && (newTokens < tokens || newLemmas < lemmas) do
+  unless betterScore (newTokens, newLemmas) (tokens, lemmas) do
     return (rejected "The verified proof did not improve the source metrics.").setObjVal! "metrics" metrics
   let summary := s!"Proof tokens {tokens} → {newTokens}, explicit lemmas {lemmas} → {newLemmas}"
   return Json.mkObj [("improved", toJson true), ("metrics", metrics), ("summary", toJson summary),

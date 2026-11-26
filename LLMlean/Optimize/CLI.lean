@@ -44,12 +44,12 @@ private structure FrontendResult where
   diagnostics : String
 
 private def collect (frontend : Project.Frontend) (work : FilePath) (source setup : FilePath)
-    (verify? : Option Json := none) : IO FrontendResult := do
+    (verify? : Option Json := none) (retrievalSelector : Array String := #[]) : IO FrontendResult := do
   IO.FS.createDirAll work
   let out := work / "events.jsonl"
   let args := #[source.toString, setup.toString, out.toString]
   let args ← match verify? with
-    | none => pure (#["--with-states"] ++ args)
+    | none => pure (#["--with-states"] ++ args ++ retrievalSelector)
     | some request => do
       let req := work / "request.json"
       IO.FS.writeFile req request.compress
@@ -100,7 +100,7 @@ private structure Snapshot where
   messages : Json
   header? : Option Json
 
-private def prepare (file work : FilePath) (selector : Array String) (editorText? : Option String) : IO Snapshot := do
+private def prepare (file work : FilePath) (selector : Array String) (editorText? : Option String) (retrieve : Bool) : IO Snapshot := do
   let file ← IO.FS.realPath file
   unless file.extension == some "lean" do throw <| IO.userError "Select a Lean source file."
   let dir ← Project.root file
@@ -120,7 +120,8 @@ private def prepare (file work : FilePath) (selector : Array String) (editorText
   let sourcePath := work / "original" / file.fileName.get!
   IO.FS.createDirAll sourcePath.parent.get!
   IO.FS.writeFile sourcePath source
-  let result ← collect frontend (work / "prepare") sourcePath setupPath
+  let retrievalSelector := if retrieve && frontend.driver.fileName == some "Frontend435.lean" then selector else #[]
+  let result ← collect frontend (work / "prepare") sourcePath setupPath none retrievalSelector
   unless result.valid do throw <| IO.userError s!"Module extraction failed. {result.diagnostics.trimAsciiEnd.takeEnd 2000}"
   let record ← IO.ofExcept <| select result.events selector
   let location ← IO.ofExcept <| record.getObjValAs? Location "location"
@@ -190,28 +191,15 @@ private def dumpPrompt (s : Snapshot) : IO Json := do
   return Json.mkObj [("messages", s.messages), ("template", toJson Prompt.version),
     ("source_sha256", toJson ((digest.splitOn " ").head!))]
 
-def run (file : FilePath) (selector : Array String) (dump apply : Bool)
-    (editorText? : Option String := none) (onPhase : Phase → IO Unit := fun _ => pure ())
-    (cancelled? : Option (BaseIO Bool) := none) : IO Json := IO.FS.withTempDir fun work => do
-  onPhase .collecting
-  let s ← prepare file work selector editorText?
-  if dump then return ← dumpPrompt s
-  let replacement := (← generate s.messages onPhase cancelled?).trimAscii.toString
-  s.checkCurrent editorText?.isSome
-  unless (← Project.setup s.frontend.dir s.file s.header? s.frontend.env) == s.setup do
-    throw <| IO.userError "The Lake module setup changed since extraction."
-  let expected : Verdict.Record ← IO.ofExcept (fromJson? s.record)
-  let original ← s.verify (work / "baseline") s.sourcePath expected.proof.source true
-  let (before, _) ← IO.ofExcept <| original.mapError (s!"Original verification failed: {·}")
-  IO.ofExcept <| Verdict.checkIdentity expected.declaration expected.proof.source before
-  if Verdict.hasForbiddenAxiom before.proof then throw <| IO.userError "Original verification failed: Unapproved trust axiom"
+private def Snapshot.checkCandidate (s : Snapshot) (work : FilePath) (before : Verdict.Record)
+    (i : Nat) (replacement : String) : IO Json := do
   unless validReplacement replacement do return Verdict.rejected "Expected a complete non-thinking Lean by-proof."
   let r := s.location.proof_range
-  let candidate := work / "rewrite" / s.file.fileName.get!
+  let candidate := work / toString i / "rewrite" / s.file.fileName.get!
   IO.FS.createDirAll candidate.parent.get!
   IO.FS.writeFile candidate ((String.Pos.Raw.extract s.source 0 ⟨r.start⟩) ++ replacement ++
     String.Pos.Raw.extract s.source ⟨r.stop⟩ s.source.rawEndPos)
-  let checked ← s.verify (work / "check") candidate replacement false
+  let checked ← s.verify (work / toString i / "check") candidate replacement false
   let (after, elapsed) ← match checked with
     | .ok result => pure result
     | .error reason => return Verdict.rejected reason
@@ -220,11 +208,32 @@ def run (file : FilePath) (selector : Array String) (dump apply : Bool)
   let label := (s.file.toString.dropPrefix (s.frontend.dir.toString ++ String.singleton FilePath.pathSeparator)).toString
   let diff ← Project.output "diff" #["-u", "-L", label, "-L", label, s.sourcePath.toString, candidate.toString] s.frontend.dir
   unless diff.exitCode == 1 do throw <| IO.userError s!"Could not diff the verified rewrite. {diff.stderr}"
-  if apply then
-    if editorText?.isSome then throw <| IO.userError "Editor edits must be applied to the versioned document."
-    s.apply replacement
   return verdict.setObjVal! "diff" (toJson diff.stdout) |>.setObjVal! "start_byte" (toJson r.start)
     |>.setObjVal! "end_byte" (toJson r.stop)
+
+def run (file : FilePath) (selector : Array String) (dump apply : Bool)
+    (editorText? : Option String := none) (onPhase : Phase → IO Unit := fun _ => pure ())
+    (cancelled? : Option (BaseIO Bool) := none) : IO Json := IO.FS.withTempDir fun work => do
+  onPhase .collecting
+  if dump then return ← dumpPrompt (← prepare file work selector editorText? false)
+  let cfg ← settings
+  let s ← prepare file work selector editorText? cfg.retrieveForOptimize
+  let signatures := (s.record.getObjValAs? (Array String) "retrieval_signatures").toOption.getD #[]
+  let candidates ← generate s.messages onPhase cancelled? signatures (some cfg)
+  s.checkCurrent editorText?.isSome
+  unless (← Project.setup s.frontend.dir s.file s.header? s.frontend.env) == s.setup do
+    throw <| IO.userError "The Lake module setup changed since extraction."
+  let expected : Verdict.Record ← IO.ofExcept (fromJson? s.record)
+  let original ← s.verify (work / "baseline") s.sourcePath expected.proof.source true
+  let (before, _) ← IO.ofExcept <| original.mapError (s!"Original verification failed: {·}")
+  IO.ofExcept <| Verdict.checkIdentity expected.declaration expected.proof.source before
+  if Verdict.hasForbiddenAxiom before.proof then throw <| IO.userError "Original verification failed: Unapproved trust axiom"
+  let verdict ← candidates.select (s.checkCandidate work before) onPhase cancelled?
+  s.checkCurrent editorText?.isSome
+  if apply && (← IO.ofExcept (verdict.getObjValAs? Bool "improved")) then
+    if editorText?.isSome then throw <| IO.userError "Editor edits must be applied to the versioned document."
+    s.apply (← IO.ofExcept (verdict.getObjValAs? String "proof"))
+  return verdict
 
 
 def usage := "Usage: lake exe llmlean optimize FILE --decl FULL.NAME [--dump-prompt | --apply]"

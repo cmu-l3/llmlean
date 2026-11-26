@@ -1,4 +1,5 @@
 import LLMlean.Optimize.Extraction
+import LLMlean.Optimize.Retrieval
 
 open Lean Elab LLMlean.Optimize.Extraction
 
@@ -8,7 +9,7 @@ def emit (out : IO.FS.Handle) (j : Json) : IO Unit := out.putStrLn j.compress
 
 partial def loop (source : String) (out : IO.FS.Handle)
     (request? : Option VerifyRequest := none) (withStates := false)
-    (hadErrors := false) : Frontend.FrontendM (Bool × Bool) := do
+    (selector : List String := []) (hadErrors := false) : Frontend.FrontendM (Bool × Bool) := do
   let before ← Frontend.getCommandState
   -- Avoid retaining whole-module info trees, and force synchronous elaboration.
   Frontend.setCommandState { before with
@@ -67,15 +68,25 @@ partial def loop (source : String) (out : IO.FS.Handle)
     else if let some body := theoremBody? cmd then
       try
         let record ← extract source cmd body obs after.env request?.isSome withStates
+        let mut record := record
+        if let some name := declaredName? body obs then
+          let selected : Bool := match selector with
+            | ["--decl", n] => name.toString == n
+            | ["--at-byte", n] => (span? cmd).any fun r => n.toNat?.any fun p => r.start ≤ p && p < r.stop
+            | _ => false
+          if selected then
+            if let some val := after.env.findConstVal? name then
+              let signatures ← LLMlean.Optimize.projectTheorems obs.contexts[0]? before.env val record (← IO.currentDir)
+              record := record.setObjVal! "retrieval_signatures" (toJson signatures)
         let lexical := lexicalContext source scope
         emit out (record.setObjVal! "lexical_context" lexical)
       catch e => emit out (failure cmd "metadata_error" e.toString)
   -- The driver only needs the latest command.
   modify fun s => { s with commands := #[], commandState.snapshotTasks := #[] }
   if Parser.isTerminalCommand cmd then return (true, hadErrors)
-  loop source out request? withStates hadErrors
+  loop source out request? withStates selector hadErrors
 
-unsafe def run (path setupPath output : String) (requestPath? : Option String := none) (withStates := false) : IO UInt32 := do
+unsafe def run (path setupPath output : String) (requestPath? : Option String := none) (withStates := false) (selector : List String := []) : IO UInt32 := do
   initSearchPath (← findSysroot)
   enableInitializersExecution
   let source ← IO.FS.readFile path
@@ -97,7 +108,7 @@ unsafe def run (path setupPath output : String) (requestPath? : Option String :=
     ("lean_version", str Lean.versionString),
     ("imports", strings (imports.map fun i => i.module.toString))]
   let ((completed, hasErrors), _) ← StateRefT'.run
-    ((loop source out request? withStates msgs.hasErrors) { inputCtx := ictx })
+    ((loop source out request? withStates selector msgs.hasErrors) { inputCtx := ictx })
     { commandState := Command.mkState env msgs opts, parserState := ps, cmdPos := ps.pos }
   emit out <| obj [("event", str "complete"), ("has_errors", toJson hasErrors),
     ("candidate_rejected", toJson (!completed))]
@@ -109,6 +120,7 @@ unsafe def main (args : List String) : IO UInt32 := do
   match args with
   | [path, setupPath, output] => ProofRewrite.run path setupPath output
   | ["--with-states", path, setupPath, output] => ProofRewrite.run path setupPath output none true
+  | ["--with-states", path, setupPath, output, flag, value] => ProofRewrite.run path setupPath output none true [flag, value]
   | ["--verify", path, setupPath, output, request] => ProofRewrite.run path setupPath output (some request)
   | _ =>
     IO.eprintln "Usage: lean --run lean/Extract.lean SOURCE SETUP.json OUTPUT.jsonl"

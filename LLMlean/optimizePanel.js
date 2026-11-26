@@ -55,7 +55,7 @@ export default function OptimizerPanel({ pos }) {
   const counts = view.metrics
   const title = view.finished ? view.name + (counts ? ' · Verified by Lean' : '') : 'Optimizing ' + view.name
   const elapsed = waiting ? ' · ' + Math.floor((view.waitMs + Math.max(0, now - view.received)) / 1000) + 's' : ''
-  const action = view.canReview ? ['Review change', 'review'] : waiting ? ['Cancel', 'cancelWait'] : null
+  const action = view.canReview ? ['Review change', 'review'] : !view.finished ? ['Cancel', 'cancelWait'] : null
   const button = action && h('button', {
     type: 'button',
     onClick: () => session.call(method + action[1], { pos: { line, character }, id: view.id }).then(refresh, refresh),
@@ -66,5 +66,6 @@ export default function OptimizerPanel({ pos }) {
     view.message && view.message !== 'Verified by Lean' && h('div', null, view.message + elapsed),
     counts && h('div', null, 'Proof tokens ', h('strong', null, counts.tokens.join(' → ')),
       ' · Explicitly named lemmas ', h('strong', null, counts.lemmas.map(n => n ?? 'unknown').join(' → '))),
+    counts?.samples && h('div', null, counts.samples),
     button)
 }
