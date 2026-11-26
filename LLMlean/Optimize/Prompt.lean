@@ -6,7 +6,7 @@ namespace LLMlean.Optimize.Prompt
 open Lean
 open LLMlean.Optimize.Extraction (Span)
 
-def version := "rewrite-context-c-sft-v1"
+def version := "rewrite-context-c-length-first-v1"
 private def systemPrompt := (include_str "SystemPrompt.txt").trimAsciiEnd.toString
 private def omittedDefinitions : List String :=
   ["Set", "Set.Mem", "Set.instMembership", "Membership.mem", "Membership", "Nat", "Int", "Bool",
@@ -160,5 +160,14 @@ def messages (record : Json) (moduleName leanVersion : String) (imports : Json) 
   if systemPrompt.utf8ByteSize + user.utf8ByteSize > 65536 then throw "Proof context exceeds 64 KiB."
   return .arr #[Json.mkObj [("role", "system"), ("content", toJson systemPrompt)],
                 Json.mkObj [("role", "user"), ("content", toJson user)]]
+
+/-- Append whole signatures while preserving the original training prompt's field order. -/
+def withLemmas (messages : Json) (signatures : Array String) : Option Json := do
+  let #[system, user] ← messages.getArr?.toOption | none
+  let content ← (user.getObjValAs? String "content").toOption
+  let text := (content.dropEnd 1).toString ++ ",\"additional_available_lemmas\":" ++
+    array (signatures.map quote) ++ "}"
+  guard (systemPrompt.utf8ByteSize + text.utf8ByteSize ≤ 65536)
+  return .arr #[system, user.setObjVal! "content" (toJson text)]
 
 end LLMlean.Optimize.Prompt

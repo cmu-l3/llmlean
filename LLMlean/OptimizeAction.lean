@@ -37,6 +37,7 @@ namespace LLMlean.Optimize
       if ← ctx.cancelTk.wasCancelled then return true
       if let some panel := panel? then return ← panel.cancel.isSet
       return false
+    let noImprovement := "Failed to find an improved proof."
     let ensureCurrent := do
       if ← cancelled then throw <| IO.userError "Optimization cancelled."
     try
@@ -45,13 +46,8 @@ namespace LLMlean.Optimize
         if let some panel := panel? then Panel.phase panel token message
       let result ← Editor.run doc file snap cmdRange proofRange onPhase cancelled
       ensureCurrent
-      let metrics := (result.getObjVal? "metrics").toOption.getD .null
       unless ← IO.ofExcept (result.getObjValAs? Bool "improved") do
-        let why ← IO.ofExcept (result.getObjValAs? String "detail")
-        if let some panel := panel? then
-          Panel.update panel fun _ => { message := why, metrics, finished := true }
-          if ctx.initParams.capabilities.lean?.isSome || token.isSome then return action
-        throw <| IO.userError s!"No verified improvement found. {why}"
+        throw <| IO.userError noImprovement
       let original ← IO.ofExcept (result.getObjValAs? String "original")
       unless original.crlfToLf == (proofRange.start.extract text.source proofRange.stop) do
         throw <| IO.userError "The checked proof differs from the editor selection. Run Optimize proof again."
@@ -62,6 +58,7 @@ namespace LLMlean.Optimize
       let annotation : ChangeAnnotation := { label := summary, needsConfirmation := true }
       let edit := { edit with changeAnnotations? := some (.ofList [("optimize", annotation)]) }
       if let some panel := panel? then
+        let metrics := (result.getObjVal? "metrics").toOption.getD .null
         let verified : Panel.Feedback := { message := "Verified by Lean", metrics, finished := true }
         if Panel.supportsReview ctx.initParams.capabilities then
           panel.feedback.atomically <| set { verified with edit? := some edit }
@@ -69,11 +66,13 @@ namespace LLMlean.Optimize
           return action
         Panel.update panel fun _ => verified
       return { action with edit? := some edit }
-    catch e =>
+    catch _ =>
+      let stopped ← cancelled
+      let message := if stopped then "Optimization cancelled." else noImprovement
       if let some panel := panel? then
-        Panel.update panel fun s => { s with message := e.toString, waitingSince? := none, finished := true }
-        if ← cancelled then return action
-      throw e
+        Panel.update panel fun _ => { message, finished := true }
+        if stopped || ctx.initParams.capabilities.lean?.isSome || token.isSome then return action
+      throw <| IO.userError message
     finally
       if let some panel := panel? then
         Panel.endProgress token (← panel.feedback.atomically get).message

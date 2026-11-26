@@ -79,7 +79,7 @@ The [demo project](LLMleanDemo/README.md) has examples to try in VS Code, with w
 
 ### Rewrite a proof
 
-Use the **LLMLean: Optimize proof** code action to rewrite a proof with fewer tokens and/or fewer explicit lemmas.
+Use **LLMLean: Optimize proof** to shorten a proof. At equal length, it prefers fewer explicitly named lemmas.
 
 ```diff
  theorem swap (P Q : Prop) (h : P ∧ Q) : Q ∧ P := by
@@ -214,6 +214,8 @@ Local servers must support the Responses API.
 
 To customize LLMLean's proof optimization features (see [Rewrite a proof](#rewrite-a-proof)), create `llmlean-optimize.toml` in your project root.
 Otherwise, proof optimization uses your existing LLMLean settings, including those from `llmlean.toml`.
+
+For a local GPU model, set `optimize_candidates = 32` to sample 32 rewrites in parallel. Lean checks each distinct candidate. With Lean 4.35 and vLLM, set `optimize_retrieval_tokens = 1024` to include up to 1,024 tokens of ranked project theorem signatures in every draw. The defaults are one candidate and zero retrieval tokens.
 
 </details>
 

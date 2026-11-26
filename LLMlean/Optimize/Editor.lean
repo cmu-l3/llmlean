@@ -1,6 +1,7 @@
 module
 public meta import Lean.Server.FileWorker.Utils
 public meta import LLMlean.Optimize
+public meta import LLMlean.Optimize.Retrieval
 public meta import LLMlean.Optimize.Extraction
 
 public meta section
@@ -13,6 +14,7 @@ namespace LLMlean.Optimize.Editor
 private structure TheoremData where
   declaration : ConstantVal
   record : Json
+  context? : Option ContextInfo
 
 private def theoremData (source : String) (cmd : Syntax) (tree : InfoTree) (env : Environment)
     (withStates : Bool) : IO TheoremData := do
@@ -24,7 +26,7 @@ private def theoremData (source : String) (cmd : Syntax) (tree : InfoTree) (env 
     throw <| IO.userError s!"Could not extract the proof: {why}"
   let some decl := (declaredName? body observations).bind env.find? |
     throw <| IO.userError "Missing elaborated declaration."
-  return ⟨decl.toConstantVal, result⟩
+  return ⟨decl.toConstantVal, result, observations.contexts[0]?⟩
 
 /-- Stop at the selected command, even when the rest of the buffer is still elaborating. -/
 private def previous (doc : FileWorker.EditableDocument) (snap : Snapshot) : IO Snapshot := do
@@ -98,19 +100,25 @@ def run (doc : FileWorker.EditableDocument) (file : System.FilePath) (snap : Sna
     |>.setObjVal! "context" ((← IO.ofExcept (original.record.getObjVal? "context")).setObjVal!
       "imports" (toJson (snap.env.imports.map fun i => i.module.toString)))
   let messages ← editorMessages record file (toJson (Elab.HeaderSyntax.toModuleHeader ⟨doc.initSnap.stx⟩))
-  let proof ← generate messages onPhase (some cancelled)
-  let token ← IO.CancelToken.new
-  let task ← IO.asTask (check doc before cmdRange proofRange original proof token) .dedicated
-  let start ← IO.monoMsNow
-  repeat
-    if ← IO.hasFinished task then return ← IO.ofExcept task.get
-    if ← cancelled then
-      token.set
-      throw <| IO.userError "Optimization cancelled."
-    if (← IO.monoMsNow) - start >= 25000 then
-      token.set
-      throw <| IO.userError "Lean verification timed out."
-    IO.sleep 10
-  throw <| IO.userError "Lean verification interrupted."
+  let cfg ← settings
+  let signatures ← if cfg.retrieveForOptimize then
+      projectTheorems original.context? before.env original.declaration record (← Project.root (← IO.FS.realPath file))
+    else pure #[]
+  let candidates ← generate messages onPhase (some cancelled) signatures (some cfg)
+  let verify := fun (_ : Nat) (proof : String) => do
+    let token ← IO.CancelToken.new
+    let task ← IO.asTask (check doc before cmdRange proofRange original proof token) .dedicated
+    let start ← IO.monoMsNow
+    repeat
+      if ← IO.hasFinished task then return ← IO.ofExcept task.get
+      if ← cancelled then
+        token.set
+        throw <| IO.userError "Optimization cancelled."
+      if (← IO.monoMsNow) - start >= 25000 then
+        token.set
+        throw <| IO.userError "Lean verification timed out."
+      IO.sleep 10
+    throw <| IO.userError "Lean verification interrupted."
+  candidates.select verify onPhase (some cancelled) (showRetrieval := false)
 
 end LLMlean.Optimize.Editor

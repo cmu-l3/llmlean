@@ -62,7 +62,8 @@ private def configTests : IO Unit := do
       "mode = 'iterative'", "apiKey = 'must-not-be-accepted'", "unknown = 1", "model = [",
       "history_chars = -1", "premise_chars = '100'", "context_mode = false"] do
     expectFailure (Config.parse source)
-  for file in [({ attempts := some 0 } : Config.Overrides), { maxOutputTokens := some 0 },
+  for file in [({ attempts := some 0 } : Config.Overrides), { optimizeCandidates := some 0 },
+      { optimizeCandidates := some 33 }, { maxOutputTokens := some 0 },
       { timeoutSeconds := some 0 }, { provider := some "anthropic" }, { model := some "" },
       { reasoningEffort := some "off" }, { contextMode := some "unknown" },
       { baseUrl := some "http://localhost/v1/responses" }, { baseUrl := some "not-a-url" }] do

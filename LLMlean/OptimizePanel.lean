@@ -83,7 +83,7 @@ structure RunAt where
 @[server_rpc_method]
 def cancelWait (p : RunAt) : RequestM (RequestTask Unit) := RequestM.pureTask do
   if let some run ← findRun (← RequestM.readDoc) p.pos then
-    if run.id == p.id && (← run.feedback.atomically get).waitingSince?.isSome then
+    if run.id == p.id && !(← run.feedback.atomically get).finished then
       run.cancel.set
 
 def supportsReview (caps : ClientCapabilities) : Bool := Id.run do
@@ -104,7 +104,7 @@ def openPreview (run : Run) (ctx : RequestContext) : IO Unit := do
   let reply ← ctx.serverRequestEmitter "workspace/applyEdit" (toJson params)
   discard <| ServerTask.IO.mapTaskCheap (t := reply) fun result => do
     let message := match result with
-      | .failure _ why => s!"Could not open preview. {why}"
+      | .failure _ _ => "Could not open the proof preview."
       | .success _ => "Verified by Lean"
     update run fun s => { s with previewOpen := false, message }
 
@@ -125,7 +125,7 @@ def beginProgress (run : Run) (ctx : RequestContext) : IO (Option String) := do
 def phase (run : Run) (token : Option String) (stage : Phase) : IO Unit := do
   let message := stage.message
   let since ← match stage with
-    | .waiting _ => some <$> IO.monoMsNow
+    | .waiting _ _ => some <$> IO.monoMsNow
     | _ => pure none
   update run fun s => { s with message, waitingSince? := since }
   if let some token := token then

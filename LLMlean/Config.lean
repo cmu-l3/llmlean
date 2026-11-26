@@ -62,6 +62,8 @@ structure Overrides where
   model : Option String := none
   baseUrl : Option String := none
   attempts : Option Nat := none
+  optimizeCandidates : Option Nat := none
+  optimizeRetrievalTokens : Option Nat := none
   maxOutputTokens : Option Nat := none
   reasoningEffort : Option String := none
   timeoutSeconds : Option Nat := none
@@ -81,6 +83,8 @@ structure Settings where
   baseUrl : String := "https://api.openai.com/v1"
   apiKeyEnv : String := "OPENAI_API_KEY"
   attempts : Nat := 3
+  optimizeCandidates : Nat := 1
+  optimizeRetrievalTokens : Nat := 0
   maxOutputTokens : Nat := 4096
   reasoningEffort : String := "default"
   timeoutSeconds : Nat := 90
@@ -93,6 +97,8 @@ structure Settings where
   definitionChars : Nat := 1200
   deriving Inhabited, Repr
 
+def Settings.retrieveForOptimize (s : Settings) : Bool := s.provider == "local" && s.optimizeRetrievalTokens > 0
+
 def Settings.responsesUrl (s : Settings) : String := s.baseUrl ++ "/responses"
 
 private def pick (high low : Overrides) : Overrides := {
@@ -100,6 +106,8 @@ private def pick (high low : Overrides) : Overrides := {
   model := high.model.or low.model
   baseUrl := high.baseUrl.or low.baseUrl
   attempts := high.attempts.or low.attempts
+  optimizeCandidates := high.optimizeCandidates.or low.optimizeCandidates
+  optimizeRetrievalTokens := high.optimizeRetrievalTokens.or low.optimizeRetrievalTokens
   maxOutputTokens := high.maxOutputTokens.or low.maxOutputTokens
   reasoningEffort := high.reasoningEffort.or low.reasoningEffort
   timeoutSeconds := high.timeoutSeconds.or low.timeoutSeconds
@@ -157,6 +165,8 @@ def resolve (file env : Overrides := {}) (opts : Options := {}) : Except String 
   let settings : Settings := {
     provider, model, baseUrl, apiKeyEnv := keyEnv
     attempts := o.attempts.getD 3
+    optimizeCandidates := o.optimizeCandidates.getD 1
+    optimizeRetrievalTokens := o.optimizeRetrievalTokens.getD 0
     maxOutputTokens := o.maxOutputTokens.getD 4096
     reasoningEffort := o.reasoningEffort.getD "default"
     timeoutSeconds := o.timeoutSeconds.getD 90
@@ -169,6 +179,8 @@ def resolve (file env : Overrides := {}) (opts : Options := {}) : Except String 
     definitionChars := o.definitionChars.getD 1200
   }
   if settings.attempts == 0 then throw "attempts must be a positive integer"
+  unless settings.optimizeCandidates ≥ 1 && settings.optimizeCandidates ≤ 32 do
+    throw "optimize_candidates must be between 1 and 32"
   if settings.maxOutputTokens == 0 then throw "max_output_tokens must be a positive integer"
   if settings.timeoutSeconds == 0 then throw "timeout_seconds must be a positive integer"
   unless #["default", "none", "minimal", "low", "medium", "high", "xhigh"].contains settings.reasoningEffort do
@@ -179,7 +191,7 @@ def resolve (file env : Overrides := {}) (opts : Options := {}) : Except String 
 
 open Lake Toml in
 def decodeTable (table : Table) : Except String Overrides := do
-  let known := #[`provider, `model, `base_url, `attempts, `max_output_tokens, `reasoning_effort,
+  let known := #[`provider, `model, `base_url, `attempts, `optimize_candidates, `optimize_retrieval_tokens, `max_output_tokens, `reasoning_effort,
     `timeout_seconds, `verbose, `context_mode, `history_chars, `premise_chars, `notation_chars,
     `repair_chars, `definition_chars]
   for (key, _) in table.items do
@@ -191,6 +203,8 @@ def decodeTable (table : Table) : Except String Overrides := do
       model := ← table.decode? `model
       baseUrl := ← table.decode? `base_url
       attempts := ← table.decode? `attempts
+      optimizeCandidates := ← table.decode? `optimize_candidates
+      optimizeRetrievalTokens := ← table.decode? `optimize_retrieval_tokens
       maxOutputTokens := ← table.decode? `max_output_tokens
       reasoningEffort := ← table.decode? `reasoning_effort
       timeoutSeconds := ← table.decode? `timeout_seconds
@@ -254,6 +268,8 @@ def loadEnv : IO Overrides := do
     model := ← IO.getEnv "LLMLEAN_MODEL"
     baseUrl := ← IO.getEnv "LLMLEAN_BASE_URL"
     attempts := ← envNat "LLMLEAN_ATTEMPTS"
+    optimizeCandidates := ← envNat "LLMLEAN_OPTIMIZE_CANDIDATES"
+    optimizeRetrievalTokens := ← envNat "LLMLEAN_OPTIMIZE_RETRIEVAL_TOKENS"
     maxOutputTokens := ← envNat "LLMLEAN_MAX_OUTPUT_TOKENS"
     reasoningEffort := ← IO.getEnv "LLMLEAN_REASONING_EFFORT"
     timeoutSeconds := ← envNat "LLMLEAN_TIMEOUT_SECONDS"

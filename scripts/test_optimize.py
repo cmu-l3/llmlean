@@ -11,6 +11,7 @@ import signal
 import subprocess
 import tempfile
 import threading
+import time
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / 'Tests/OptimizeExample.lean'
@@ -114,12 +115,14 @@ def check_demo_infoview(env, calls):
         edit = preview['params']['edit']
         assert edit['documentChanges'][0]['textDocument'] == {'uri': uri, 'version': 1}
         assert edit['changeAnnotations']['optimize']['needsConfirmation']
-        lsp.write(dict(jsonrpc='2.0', id=preview['id'], result={'applied': False}))
+        lsp.write(dict(jsonrpc='2.0', id=preview['id'], error={'code': -32603, 'message': 'Internal client details'}))
         for index in range(30):
-            if rpc(panel + 'status', pos, 10 + index)['canReview']:
+            failed_preview = rpc(panel + 'status', pos, 10 + index)
+            if failed_preview['canReview']:
+                assert failed_preview['message'] == 'Could not open the proof preview.'
                 break
         else:
-            raise AssertionError('Dismissed suggestion could not be reviewed')
+            raise AssertionError('Failed preview could not be reviewed')
         args = {'id': state['id'], 'pos': pos}
         rpc(panel + 'review', args, 40)
         assert len(lsp.previews) == 2 and lsp.previews[1]['params']['edit'] == edit
@@ -174,7 +177,9 @@ end ScopeTest
         }), 1)
         lsp.send('initialized', {})
         lsp.send('textDocument/didOpen', dict(textDocument=dict(uri=uri, languageId='lean4', version=1, text=source)))
+        session = lsp.send('$/lean/rpc/connect', {'uri': uri}, 3)['sessionId']
         cases = [
+            (None, False),  # The model endpoint returns HTTP 503.
             ('by exact ⟨hq, hp⟩', False),
             ('by exact later h', False),
             ('by exact unproved h', False),
@@ -196,15 +201,17 @@ end ScopeTest
             assert ('edit' in resolved) == improved, (proof, lsp.notifications[-3:])
             if improved:
                 assert resolved['edit']['documentChanges'][0]['edits'][0]['newText'] == proof
-            if '.swapViaDot' in proof or '.intro' in proof:
+            if improved and ('.swapViaDot' in proof or '.intro' in proof):
                 label = resolved['edit']['changeAnnotations']['optimize']['label']
                 lemma_count = 1 if '.swapViaDot' in proof else 2
                 assert label.endswith(f'explicit lemmas 2 → {lemma_count}'), label
-            if 'closeNamed' in proof:
-                assert lsp.notifications[-1]['params']['value']['message'] == (
-                    'Could not count all explicitly named lemmas in the rewrite.')
-            if 'unproved h' in proof:
-                assert 'New unapproved axiom' in lsp.notifications[-1]['params']['value']['message']
+            if not improved:
+                message = 'Failed to find an improved proof.'
+                assert lsp.notifications[-1]['params']['value']['message'] == message
+                status = lsp.send('$/lean/rpc/call', dict(textDocument=document, position=pos,
+                    sessionId=session, method='LLMlean.Optimize.Panel.status', params=pos), 100 + i)
+                assert status['finished'] and status['message'] == message
+                assert status['metrics'] is None and not status['canReview']
         payload = json.loads(calls[-1]['input'][1]['content'])
         assert payload['original_environment']['namespace'] == 'ScopeTest'
         assert payload['original_environment']['section_variables']
@@ -215,28 +222,56 @@ end ScopeTest
 
 def test():
     calls = []
+    tokenizer_calls = []
     response = [PROOF]
+    lock = threading.Lock()
+    active = peak = 0
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_):
             pass
 
         def do_POST(self):
+            nonlocal active, peak
+            request = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+            if self.path == '/tokenize':
+                tokenizer_calls.append(request)
+                payload = json.loads(request['messages'][1]['content'])
+                added = len(payload.get('additional_available_lemmas', []))
+                body = json.dumps(dict(count=100 + 50 * added, max_model_len=2198)).encode()
+                self.send_response(200)
+                self.send_header('Content-Length', str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
             assert self.path == '/v1/responses'
-            calls.append(json.loads(self.rfile.read(int(self.headers['Content-Length']))))
-            body = json.dumps(dict(status='completed', output=[dict(type='message', role='assistant',
-                content=[dict(type='output_text', text=response[0])])])).encode()
-            self.send_response(200)
-            self.send_header('Content-Length', str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+            with lock:
+                calls.append(request)
+                proof = response.pop(0) if len(response) > 1 else response[0]
+                active += 1
+                peak = max(peak, active)
+            try:
+                if 'temperature' in request:
+                    time.sleep(0.05)
+                if proof is None:
+                    self.send_error(503)
+                    return
+                body = json.dumps(dict(status='completed', output=[dict(type='message', role='assistant',
+                    content=[dict(type='output_text', text=proof)])])).encode()
+                self.send_response(200)
+                self.send_header('Content-Length', str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            finally:
+                with lock:
+                    active -= 1
 
     with ThreadingHTTPServer(('127.0.0.1', 0), Handler) as server, tempfile.TemporaryDirectory() as tmp:
         threading.Thread(target=server.serve_forever, daemon=True).start()
         cfg = Path(tmp) / 'llmlean.toml'
         cfg.write_text('provider="local"\n')
         env = dict(os.environ, LLMLEAN_CONFIG=str(cfg), LLMLEAN_BASE_URL=f'http://127.0.0.1:{server.server_port}/v1',
-                   LLMLEAN_MODEL='fixture', OPENAI_API_KEY='loopback-fixture-key', LLMLEAN_API_KEY='')
+                   LLMLEAN_MODEL='fixture', LLMLEAN_OPTIMIZE_CANDIDATES='1', LLMLEAN_OPTIMIZE_RETRIEVAL_TOKENS='0', OPENAI_API_KEY='loopback-fixture-key', LLMLEAN_API_KEY='')
         # Run the installed application with Python and uv unavailable to child processes.
         blocked = Path(tmp) / 'bin'
         blocked.mkdir()
@@ -246,21 +281,44 @@ def test():
             shim.chmod(0o755)
         env['PATH'] = str(blocked) + os.pathsep + env['PATH']
         cli = [str(ROOT / '.lake/build/bin/llmlean'), 'optimize']
-        def run(path, flags=(), provider='local'):
+        def run(path, flags=(), provider='local', candidates=1, retrieval=0):
             return subprocess.check_output(cli + [str(path), '--decl', 'OptimizeExample.swap', *flags],
-                                          cwd=ROOT, env=dict(env, LLMLEAN_PROVIDER=provider), text=True)
+                                          cwd=ROOT, env=dict(env, LLMLEAN_PROVIDER=provider,
+                                                             LLMLEAN_OPTIMIZE_CANDIDATES=str(candidates),
+                                                             LLMLEAN_OPTIMIZE_RETRIEVAL_TOKENS=str(retrieval)), text=True)
         expected = json.loads(run(FIXTURE, ['--dump-prompt']))['messages']
-        # Pinned from the training formatter on this fixture, with fresh goal IDs normalized.
         system, _, payload = comparable_messages(expected)
+        assert system == {'role': 'system', 'content': (ROOT / 'LLMlean/Optimize/SystemPrompt.txt').read_text().rstrip()}
+        # The context payload matches the training formatter after normalizing fresh goal IDs.
         content = json.dumps(payload, ensure_ascii=False, separators=(',', ':'))
-        assert hashlib.sha256((system['content'] + '\n' + content).encode()).hexdigest() == (
-            '8ad0fcf342af42cade09dfbe6fc675c2c75933a27b7bd92888688af920287bbc')
+        assert hashlib.sha256(content.encode()).hexdigest() == (
+            'a642d1d8f5b375ae6ba5ef25a30023a20c912d4a0dd538b115827dfc26c27708')
         original = FIXTURE.read_bytes()
         for provider in ['openai', 'local']:
-            assert 'Proof tokens' in run(FIXTURE, provider=provider)
+            start = len(calls)
+            assert 'Proof tokens' in run(FIXTURE, provider=provider, candidates=32 if provider == 'openai' else 1,
+                                         retrieval=1024 if provider == 'openai' else 0)
+            assert len(calls) == start + 1 and 'temperature' not in calls[-1]
             assert calls[-1]['input'] == expected and calls[-1]['max_output_tokens'] == 2048
         assert calls[-1]['reasoning'] == {'effort': 'none'}
-        assert FIXTURE.read_bytes() == original
+        assert FIXTURE.read_bytes() == original and not tokenizer_calls
+        with tempfile.NamedTemporaryFile(prefix='Retrieval', suffix='.lean', dir=FIXTURE.parent) as copy:
+            copy.write(original.replace(b'theorem swap', b'theorem earlier : True := by trivial\n\ntheorem swap')
+                       .replace(b'end OptimizeExample', b'theorem later : True := by trivial\nend OptimizeExample'))
+            copy.flush()
+            plain = json.loads(run(copy.name, ['--dump-prompt']))['messages']
+            start = len(calls)
+            summary = run(copy.name, candidates=32, retrieval=1024)
+            inputs = [r['input'] for r in calls[start:]]
+            assert len(inputs) == 32 and all(m == inputs[0] for m in inputs)
+            enhanced = inputs[0]
+            assert enhanced[0] == plain[0]
+            lemmas = json.loads(enhanced[1]['content'])['additional_available_lemmas']
+            assert len(lemmas) == 1 and lemmas[0].split()[1] in {'OptimizeExample.earlier', 'OptimizeExample.keep'}
+            assert enhanced[1]['content'].startswith(plain[1]['content'][:-1] + ',"additional_available_lemmas":')
+            assert '+50 prompt tokens' in summary
+            assert '0 retrieved signatures' in run(copy.name, retrieval=49)
+            assert calls[-1]['input'] == plain
         response[0] = 'by sorry'
         assert 'No verified improvement' in run(FIXTURE)
         response[0] = PROOF
@@ -275,7 +333,33 @@ def test():
             assert 'No verified improvement' in run(copy.name, ['--apply'])
             assert Path(copy.name).read_bytes() == accepted
 
-        with contextlib.closing(Session(dict(env, LLMLEAN_PROVIDER='local'))) as lsp:
+        response[:] = [None, 'by sorry', PROOF, 'by grind', PROOF]
+        start = len(calls)
+        with tempfile.NamedTemporaryFile(prefix='Optimizer', suffix='.lean', dir=FIXTURE.parent) as copy:
+            copy.write(original)
+            copy.flush()
+            batch_prompt = json.loads(run(copy.name, ['--dump-prompt']))['messages']
+            summary = run(copy.name, ['--apply'], candidates=32)
+            assert '31/32 responses, 3 distinct candidates, 2 verified improvements' in summary, summary
+            assert Path(copy.name).read_text() == original.decode().replace(
+                json.loads(expected[1]['content'])['original_proof'], 'by grind')
+        batch = calls[start:]
+        assert len(batch) == 32 and 1 < peak <= 8
+        assert all(r['temperature'] == 0.7 and r['top_p'] == 0.9 and r['input'] == batch_prompt for r in batch)
+        response[:] = ['by sorry']
+        assert '0 verified improvements' in run(FIXTURE, candidates=2)
+        response[:] = [None]
+        try:
+            run(FIXTURE, candidates=2)
+        except subprocess.CalledProcessError:
+            pass
+        else:
+            raise AssertionError('All requests failed, expected a model error')
+
+        response[:] = ['by sorry', PROOF, 'by grind', PROOF]
+        sampled_env = dict(env, LLMLEAN_PROVIDER='local', LLMLEAN_OPTIMIZE_CANDIDATES='4',
+                           LLMLEAN_OPTIMIZE_RETRIEVAL_TOKENS='1024')
+        with contextlib.closing(Session(sampled_env)) as lsp:
             uri = FIXTURE.as_uri()
             lsp.send('initialize', dict(processId=os.getpid(), rootUri=ROOT.as_uri(), capabilities={
                 'textDocument': {'codeAction': {'dataSupport': True, 'resolveSupport': {'properties': ['edit']}}},
@@ -296,7 +380,15 @@ def test():
             change, = edit['documentChanges']
             assert change['textDocument'] == {'uri': uri, 'version': 7}
             one, = change['edits']
-            assert one['newText'] == PROOF and edit['changeAnnotations'][one['annotationId']]['needsConfirmation']
+            assert len(calls) == prior + 4
+            assert one['newText'] == 'by grind' and edit['changeAnnotations'][one['annotationId']]['needsConfirmation']
+            assert all(json.loads(call['input'][1]['content'])['additional_available_lemmas'] for call in calls[prior:])
+            session = lsp.send('$/lean/rpc/connect', {'uri': uri}, 4)['sessionId']
+            status = lsp.send('$/lean/rpc/call', dict(textDocument=dict(uri=uri), position=pos,
+                sessionId=session, method='LLMlean.Optimize.Panel.status', params=pos), 5)
+            samples = '4/4 responses, 3 distinct candidates, 2 verified improvements'
+            assert status['metrics']['samples'] == samples
+            assert edit['changeAnnotations'][one['annotationId']]['label'].endswith(samples)
             assert FIXTURE.read_bytes() == original
         check_demo_infoview(dict(env, LLMLEAN_PROVIDER='local'), calls)
         demo = ROOT / 'LLMleanDemo/Demo.lean'
