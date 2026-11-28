@@ -99,6 +99,8 @@ Proof optimization is also available on the CLI.
 lake exe llmlean optimize LLMleanDemo/Demo.lean --decl Demo.swap
 ```
 
+See the [LM Studio dropdown below](#lm-studio-llmlean-optimize-9b) to use [LLMLean-Optimize-9B](https://lmstudio.ai/l3lab/llmlean-optimize-9b-v0.1), a local model fine-tuned for Lean proof optimization.
+
 ## Installation
 
 Requires Lean **4.35.0**.
@@ -186,23 +188,28 @@ No API key is needed for the default local server. For this model,
 
 </details>
 
-<details>
-<summary><strong>Ollama</strong> · Local models</summary>
+<a name="lm-studio-llmlean-optimize-9b"></a>
 
-Install and start [Ollama](https://ollama.com/), then pull a model:
+<details>
+<summary><strong>LM Studio</strong> · LLMLean-Optimize-9B</summary>
+
+Download and serve the model with the LM Studio CLI.
 
 ```sh
-ollama pull qwen3.5:9b-q4_K_M
+lms get l3lab/llmlean-optimize-9b-v0.1
+lms load l3lab/llmlean-optimize-9b-v0.1 --identifier llmlean-optimize-9b-v0.1
+lms server start --port 1234
 ```
 
-Create `llmlean.toml` in your project directory:
+Create `llmlean-optimize.toml` in your project root.
 
 ```toml
 provider = "local"
-model = "qwen3.5:9b-q4_K_M"
+base_url = "http://localhost:1234/v1"
+model = "llmlean-optimize-9b-v0.1"
 ```
 
-No API key is needed.
+**Optimize proof** samples four rewrites by default and suggests the best improvement that Lean verifies.
 
 </details>
 
@@ -215,7 +222,7 @@ Local servers must support the Responses API.
 To customize LLMLean's proof optimization features (see [Rewrite a proof](#rewrite-a-proof)), create `llmlean-optimize.toml` in your project root.
 Otherwise, proof optimization uses your existing LLMLean settings, including those from `llmlean.toml`.
 
-For a local GPU model, set `optimize_candidates = 32` to sample 32 rewrites in parallel. Lean checks each distinct candidate. With Lean 4.35 and vLLM, set `optimize_retrieval_tokens = 1024` to include up to 1,024 tokens of ranked project theorem signatures in every draw. The defaults are one candidate and zero retrieval tokens.
+Set `optimize_candidates` (1–32) to change how many local rewrites to sample. With Lean 4.35 and vLLM, set `optimize_retrieval_tokens = 1024` to include up to 1,024 tokens of ranked project theorem signatures. Retrieval is off by default.
 
 </details>
 

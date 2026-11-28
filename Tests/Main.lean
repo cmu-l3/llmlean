@@ -22,6 +22,7 @@ private def configTests : IO Unit := do
   ensure (localSettings.model == "qwen3.5:9b-q4_K_M" &&
     localSettings.responsesUrl == "http://localhost:11434/v1/responses" &&
     localSettings.apiKeyEnv == "LLMLEAN_API_KEY") "Explicit local provider retains Ollama defaults"
+  ensure (localSettings.optimizeCandidates == 4) "Local proof optimization defaults to four candidates"
   let explicitDefault ← IO.ofExcept (Config.resolve { provider := some "local" } {}
     (({} : Options).set `llmlean.provider "openai"))
   ensure (explicitDefault.provider == "openai" && explicitDefault.model == "gpt-6-luna")

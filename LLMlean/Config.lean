@@ -55,6 +55,7 @@ register_option llmlean.definitionChars : Nat := {
 
 def defaultModel : String := "gpt-6-luna"
 def defaultLocalModel : String := "qwen3.5:9b-q4_K_M"
+def defaultOptimizeCandidates : Nat := 4
 
 /-- Preserve absence, including for booleans and default-valued overrides. -/
 structure Overrides where
@@ -83,7 +84,7 @@ structure Settings where
   baseUrl : String := "https://api.openai.com/v1"
   apiKeyEnv : String := "OPENAI_API_KEY"
   attempts : Nat := 3
-  optimizeCandidates : Nat := 1
+  optimizeCandidates : Nat := defaultOptimizeCandidates
   optimizeRetrievalTokens : Nat := 0
   maxOutputTokens : Nat := 4096
   reasoningEffort : String := "default"
@@ -165,7 +166,7 @@ def resolve (file env : Overrides := {}) (opts : Options := {}) : Except String 
   let settings : Settings := {
     provider, model, baseUrl, apiKeyEnv := keyEnv
     attempts := o.attempts.getD 3
-    optimizeCandidates := o.optimizeCandidates.getD 1
+    optimizeCandidates := o.optimizeCandidates.getD defaultOptimizeCandidates
     optimizeRetrievalTokens := o.optimizeRetrievalTokens.getD 0
     maxOutputTokens := o.maxOutputTokens.getD 4096
     reasoningEffort := o.reasoningEffort.getD "default"

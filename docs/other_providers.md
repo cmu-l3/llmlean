@@ -20,6 +20,9 @@ provider = "openrouter"
 model = "<model-id-listed-by-the-provider>"
 ```
 
+For [Ollama](https://ollama.com/), start the server, run `ollama pull qwen3.5:9b-q4_K_M`,
+and set `provider = "local"` in `llmlean.toml`.
+
 An alternative local server must implement the Responses API; Chat Completions compatibility
 alone is insufficient. Point at its API base URL, excluding `/responses`:
 
